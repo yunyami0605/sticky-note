@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Note color themes */
+@layer components {
+  .note-yellow  { --note-bg: #fef9c3; --note-header: #fde047; --note-text: #1c1917; }
+  .note-blue    { --note-bg: #dbeafe; --note-header: #93c5fd; --note-text: #1e3a5f; }
+  .note-green   { --note-bg: #dcfce7; --note-header: #86efac; --note-text: #14532d; }
+  .note-pink    { --note-bg: #fce7f3; --note-header: #f9a8d4; --note-text: #831843; }
+  .note-purple  { --note-bg: #ede9fe; --note-header: #c4b5fd; --note-text: #3b0764; }
+  .note-white   { --note-bg: #ffffff; --note-header: #e5e7eb; --note-text: #111827; }
+
+  .note-bg     { background-color: var(--note-bg); }
+  .note-header { background-color: var(--note-header); }
+  .note-text   { color: var(--note-text); }
+}
+
+/* Tiptap editor reset */
+.tiptap {
+  outline: none;
+  min-height: 100%;
+}
+
+.tiptap p { margin: 0 0 0.25rem; }
+.tiptap ul, .tiptap ol { padding-left: 1.25rem; margin: 0.25rem 0; }
+.tiptap h1 { font-size: 1.5rem; font-weight: 700; margin: 0.5rem 0 0.25rem; }
+.tiptap h2 { font-size: 1.25rem; font-weight: 600; margin: 0.4rem 0 0.2rem; }
+.tiptap h3 { font-size: 1.1rem; font-weight: 600; margin: 0.3rem 0 0.1rem; }
+
+/* Task list */
+.tiptap ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+.tiptap ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+.tiptap ul[data-type="taskList"] li > label {
+  margin-top: 2px;
+}
+
+/* Placeholder */
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: rgba(0,0,0,0.3);
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 2px; }
