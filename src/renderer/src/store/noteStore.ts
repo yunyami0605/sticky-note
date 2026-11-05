@@ -4,29 +4,33 @@ import type { Note, CreateNotePayload, UpdateNotePayload } from '../../../shared
 interface NoteStore {
   notes: Note[]
   isLoading: boolean
+  selectedId: string | null
+  setSelectedId: (id: string | null) => void
   loadNotes: () => Promise<void>
   createNote: (payload?: CreateNotePayload) => Promise<Note>
   updateNote: (id: string, payload: UpdateNotePayload) => Promise<void>
   deleteNote: (id: string) => Promise<void>
   openNoteWindow: (noteId: string) => Promise<void>
-  // Called from IPC events pushed by main process
   _addNote: (note: Note) => void
   _removeNote: (id: string) => void
 }
 
-export const useNoteStore = create<NoteStore>((set) => ({
+export const useNoteStore = create<NoteStore>((set, get) => ({
   notes: [],
   isLoading: false,
+  selectedId: null,
+
+  setSelectedId: (id) => set({ selectedId: id }),
 
   loadNotes: async () => {
     set({ isLoading: true })
     const notes = await window.api.note.getAll()
-    set({ notes, isLoading: false })
+    set({ notes, isLoading: false, selectedId: notes[0]?.id ?? null })
   },
 
   createNote: async (payload) => {
     const note = await window.api.note.create(payload)
-    set((s) => ({ notes: [note, ...s.notes] }))
+    set((s) => ({ notes: [note, ...s.notes], selectedId: note.id }))
     return note
   },
 
@@ -40,7 +44,11 @@ export const useNoteStore = create<NoteStore>((set) => ({
 
   deleteNote: async (id) => {
     await window.api.note.delete(id)
-    set((s) => ({ notes: s.notes.filter((n) => n.id !== id) }))
+    set((s) => {
+      const notes = s.notes.filter((n) => n.id !== id)
+      const selectedId = s.selectedId === id ? (notes[0]?.id ?? null) : s.selectedId
+      return { notes, selectedId }
+    })
   },
 
   openNoteWindow: async (noteId) => {
@@ -52,6 +60,12 @@ export const useNoteStore = create<NoteStore>((set) => ({
       notes: s.notes.some((n) => n.id === note.id) ? s.notes : [note, ...s.notes],
     })),
 
-  _removeNote: (id) =>
-    set((s) => ({ notes: s.notes.filter((n) => n.id !== id) })),
+  _removeNote: (id) => {
+    const { notes, selectedId } = get()
+    const next = notes.filter((n) => n.id !== id)
+    set({
+      notes: next,
+      selectedId: selectedId === id ? (next[0]?.id ?? null) : selectedId,
+    })
+  },
 }))

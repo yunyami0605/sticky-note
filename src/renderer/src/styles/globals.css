@@ -52,13 +52,18 @@
   margin-top: 2px;
 }
 
-/* Placeholder */
+/* Placeholder — light background */
 .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: rgba(0,0,0,0.3);
   pointer-events: none;
   float: left;
   height: 0;
+}
+
+/* Placeholder — dark background (main panel inline editor) */
+.dark-editor .tiptap p.is-editor-empty:first-child::before {
+  color: rgba(255,255,255,0.2);
 }
 
 /* Custom scrollbar */

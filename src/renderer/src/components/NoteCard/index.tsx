@@ -1,73 +1,81 @@
-import { type Note } from '../../../../shared/types'
+import type { Note } from '../../../../shared/types'
 import { useNoteStore } from '../../store/noteStore'
 
-const COLOR_LABELS: Record<Note['color'], string> = {
-  yellow: 'bg-yellow-200',
-  blue: 'bg-blue-200',
-  green: 'bg-green-200',
-  pink: 'bg-pink-200',
-  purple: 'bg-purple-200',
-  white: 'bg-gray-100',
+const COLOR_ACCENT: Record<Note['color'], string> = {
+  yellow: 'bg-yellow-400',
+  blue:   'bg-blue-400',
+  green:  'bg-green-400',
+  pink:   'bg-pink-400',
+  purple: 'bg-purple-400',
+  white:  'bg-gray-300',
 }
 
 interface Props {
   note: Note
 }
 
-function getPreviewText(content: string): string {
-  if (!content) return '빈 메모'
+function getTitle(content: string): string {
+  if (!content) return '메모'
   try {
     const parsed = JSON.parse(content)
     const texts: string[] = []
-    const walk = (node: { type?: string; text?: string; content?: unknown[] }): void => {
+    const walk = (node: { text?: string; content?: unknown[] }): void => {
       if (node.text) texts.push(node.text)
-      node.content?.forEach((child) => walk(child as typeof node))
+      node.content?.forEach((c) => walk(c as typeof node))
     }
-    parsed.content?.forEach((n: unknown) => walk(n as { type?: string; text?: string; content?: unknown[] }))
-    return texts.join(' ').trim() || '빈 메모'
+    parsed.content?.forEach((n: unknown) => walk(n as { text?: string; content?: unknown[] }))
+    const title = texts.join(' ').trim()
+    return title || '메모'
   } catch {
-    return content.slice(0, 80)
+    return content.slice(0, 40) || '메모'
   }
 }
 
-export function NoteCard({ note }: Props): JSX.Element {
-  const { deleteNote, openNoteWindow } = useNoteStore()
+function formatDate(iso: string): string {
+  const d = new Date(iso)
+  const now = new Date()
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000)
 
-  const handleOpen = (): void => {
-    openNoteWindow(note.id)
+  if (diffDays === 0) {
+    return `오전 ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
   }
+  if (diffDays === 1) return '어제'
+  return d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric' })
+}
+
+export function NoteCard({ note }: Props): JSX.Element {
+  const { selectedId, setSelectedId, deleteNote } = useNoteStore()
+  const isSelected = selectedId === note.id
 
   const handleDelete = (e: React.MouseEvent): void => {
     e.stopPropagation()
     deleteNote(note.id)
   }
 
-  const preview = getPreviewText(note.content)
-  const updatedAt = new Date(note.updatedAt).toLocaleDateString('ko-KR', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-
   return (
     <div
-      className={`relative rounded-xl p-3 cursor-pointer group transition-all hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] note-${note.color}`}
-      onClick={handleOpen}
+      onClick={() => setSelectedId(note.id)}
+      className={`group relative flex items-center gap-0 cursor-pointer border-b border-white/5 transition-colors ${
+        isSelected ? 'bg-[#b5a07a]/30' : 'hover:bg-white/5'
+      }`}
     >
-      {/* header bar */}
-      <div className={`${COLOR_LABELS[note.color]} rounded-lg h-2 mb-2 -mx-1`} />
+      {/* color accent bar */}
+      <div className={`w-[3px] self-stretch flex-shrink-0 ${COLOR_ACCENT[note.color]}`} />
 
-      <p className="text-sm leading-relaxed line-clamp-4 note-text opacity-80">
-        {preview}
-      </p>
-
-      <p className="text-[10px] mt-2 opacity-40 note-text">{updatedAt}</p>
+      {/* content */}
+      <div className="flex flex-col px-3 py-2.5 flex-1 min-w-0">
+        <span className="text-sm text-white/90 truncate leading-snug">
+          {getTitle(note.content)}
+        </span>
+        <span className="text-[11px] text-white/35 mt-0.5">
+          {formatDate(note.updatedAt)}
+        </span>
+      </div>
 
       {/* delete button */}
       <button
         onClick={handleDelete}
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity w-5 h-5 flex items-center justify-center rounded-full bg-black/10 hover:bg-red-400 hover:text-white text-xs"
+        className="opacity-0 group-hover:opacity-100 mr-2 w-4 h-4 flex items-center justify-center rounded-full bg-white/10 hover:bg-red-500/70 text-white/60 hover:text-white text-[10px] transition-all flex-shrink-0"
         title="삭제"
       >
         ×
