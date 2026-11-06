@@ -8,6 +8,8 @@ import Heading from '@tiptap/extension-heading'
 import { useNoteStore } from '../../store/noteStore'
 import { NoteCard } from '../NoteCard'
 import { Toolbar } from '../Toolbar'
+import { ColorPicker } from '../ColorPicker'
+import type { NoteColor } from '../../../../shared/types'
 
 function InlineEditor(): JSX.Element | null {
   const { notes, selectedId, updateNote } = useNoteStore()
@@ -36,15 +38,28 @@ function InlineEditor(): JSX.Element | null {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId])
 
+  const HEADER_ACCENT: Record<Note['color'], string> = {
+    yellow: 'border-yellow-400',
+    blue:   'border-blue-400',
+    green:  'border-green-400',
+    pink:   'border-pink-400',
+    purple: 'border-purple-400',
+    white:  'border-gray-300',
+  }
+
+  const handleColorChange = (color: NoteColor): void => {
+    if (!selectedId) return
+    updateNote(selectedId, { color })
+  }
+
   if (!note) return null
 
   return (
     <div className="flex flex-col flex-1 min-w-0 h-full">
-      {/* 우측 상단 헤더 */}
-      <div
-        className="flex items-center justify-end px-4 py-2.5 border-b border-white/5"
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-      />
+      {/* 우측 상단 헤더 — 상단 컬러 액센트 바 */}
+      <div className={`flex items-center justify-end px-4 py-2.5 border-b-2 ${HEADER_ACCENT[note.color]} transition-colors`}>
+        <ColorPicker value={note.color} onChange={handleColorChange} dark />
+      </div>
 
       {/* 에디터 */}
       <div className="dark-editor flex-1 overflow-y-auto px-6 py-4 text-white/85 text-sm">

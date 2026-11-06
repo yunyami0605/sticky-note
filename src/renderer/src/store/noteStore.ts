@@ -35,6 +35,13 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   },
 
   updateNote: async (id, payload) => {
+    // 즉시 UI에 반영 (optimistic update)
+    set((s) => ({
+      notes: s.notes.map((n) =>
+        n.id === id ? { ...n, ...payload, updatedAt: new Date().toISOString() } : n
+      ),
+    }))
+    // DB 동기화
     const updated = await window.api.note.update(id, payload)
     if (!updated) return
     set((s) => ({

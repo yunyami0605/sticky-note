@@ -19,7 +19,7 @@ function NoteApp(): JSX.Element | null {
   }, [])
 
   if (!note) return null
-  return <NoteEditor note={note} />
+  return <NoteEditor note={note} onNoteChange={setNote} />
 }
 
 const root = document.getElementById('root')!

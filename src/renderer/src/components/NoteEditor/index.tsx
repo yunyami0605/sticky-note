@@ -17,14 +17,18 @@ const FONT_SIZE_CLASS: Record<FontSize, string> = {
 
 interface Props {
   note: Note
+  onNoteChange: (updated: Note) => void
 }
 
-export function NoteEditor({ note }: Props): JSX.Element {
+export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const persistUpdate = useCallback((payload: UpdateNotePayload): void => {
-    window.api.note.update(note.id, payload)
-  }, [note.id])
+    // DB 저장 + 로컬 state 즉시 반영
+    window.api.note.update(note.id, payload).then((updated) => {
+      if (updated) onNoteChange(updated)
+    })
+  }, [note.id, onNoteChange])
 
   const editor = useEditor({
     extensions: [
@@ -43,27 +47,26 @@ export function NoteEditor({ note }: Props): JSX.Element {
     },
   })
 
-  // Keep editor in sync when note changes from outside
   useEffect(() => {
     if (!editor || !note.content) return
     try {
       const incoming = JSON.parse(note.content)
-      const current = JSON.stringify(editor.getJSON())
-      if (JSON.stringify(incoming) !== current) {
+      if (JSON.stringify(incoming) !== JSON.stringify(editor.getJSON())) {
         editor.commands.setContent(incoming, false)
       }
     } catch { /* ignore */ }
   }, [note.content, editor])
 
   const handleColorChange = (color: NoteColor): void => {
-    persistUpdate({ color })
-    // Update window class immediately (optimistic)
-    document.body.className = document.body.className
-      .replace(/note-\w+/, `note-${color}`)
+    // 즉시 로컬 state 반영 후 DB 저장
+    onNoteChange({ ...note, color })
+    window.api.note.update(note.id, { color })
   }
 
   const handlePinToggle = (): void => {
-    window.api.window.setPin(note.id, !note.isPinned)
+    const isPinned = !note.isPinned
+    onNoteChange({ ...note, isPinned })
+    window.api.window.setPin(note.id, isPinned)
   }
 
   const handleMinimize = (): void => {
@@ -76,14 +79,15 @@ export function NoteEditor({ note }: Props): JSX.Element {
 
   const cycleFontSize = (): void => {
     const sizes: FontSize[] = ['sm', 'md', 'lg']
-    const next = sizes[(sizes.indexOf(note.fontSize) + 1) % sizes.length]
-    persistUpdate({ fontSize: next })
+    const fontSize = sizes[(sizes.indexOf(note.fontSize) + 1) % sizes.length]
+    onNoteChange({ ...note, fontSize })
+    window.api.note.update(note.id, { fontSize })
   }
 
   const handleOpacityChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const opacity = parseFloat(e.target.value)
-    persistUpdate({ opacity })
-    document.documentElement.style.setProperty('--note-opacity', String(opacity))
+    onNoteChange({ ...note, opacity })
+    window.api.note.update(note.id, { opacity })
   }
 
   return (
@@ -149,7 +153,7 @@ export function NoteEditor({ note }: Props): JSX.Element {
           min="0.3"
           max="1"
           step="0.05"
-          defaultValue={note.opacity}
+          value={note.opacity}
           onChange={handleOpacityChange}
           className="flex-1 h-1 accent-current opacity-40 hover:opacity-70"
           title="투명도"

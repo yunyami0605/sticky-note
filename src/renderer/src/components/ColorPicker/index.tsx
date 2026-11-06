@@ -12,9 +12,10 @@ const COLORS: { value: NoteColor; bg: string; label: string }[] = [
 interface Props {
   value: NoteColor
   onChange: (color: NoteColor) => void
+  dark?: boolean
 }
 
-export function ColorPicker({ value, onChange }: Props): JSX.Element {
+export function ColorPicker({ value, onChange, dark }: Props): JSX.Element {
   return (
     <div className="flex gap-1.5 items-center">
       {COLORS.map((c) => (
@@ -22,8 +23,10 @@ export function ColorPicker({ value, onChange }: Props): JSX.Element {
           key={c.value}
           title={c.label}
           onClick={() => onChange(c.value)}
-          className={`w-5 h-5 rounded-full ${c.bg} transition-transform hover:scale-110 ${
-            value === c.value ? 'ring-2 ring-offset-1 ring-gray-500 scale-110' : ''
+          className={`w-4 h-4 rounded-full ${c.bg} transition-transform hover:scale-110 ${
+            value === c.value
+              ? `ring-2 ring-offset-1 scale-110 ${dark ? 'ring-white/60 ring-offset-transparent' : 'ring-gray-500'}`
+              : ''
           }`}
         />
       ))}
