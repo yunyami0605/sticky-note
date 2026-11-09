@@ -5,12 +5,16 @@ interface NoteStore {
   notes: Note[]
   isLoading: boolean
   selectedId: string | null
+  openWindowIds: Set<string>
   setSelectedId: (id: string | null) => void
   loadNotes: () => Promise<void>
   createNote: (payload?: CreateNotePayload) => Promise<Note>
   updateNote: (id: string, payload: UpdateNotePayload) => Promise<void>
   deleteNote: (id: string) => Promise<void>
+  duplicateNote: (noteId: string) => Promise<Note | null>
   openNoteWindow: (noteId: string) => Promise<void>
+  toggleNoteWindow: (noteId: string) => Promise<void>
+  setWindowOpen: (id: string, open: boolean) => void
   _addNote: (note: Note) => void
   _removeNote: (id: string) => void
 }
@@ -19,13 +23,25 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   notes: [],
   isLoading: false,
   selectedId: null,
+  openWindowIds: new Set(),
 
   setSelectedId: (id) => set({ selectedId: id }),
 
+  setWindowOpen: (id, open) =>
+    set((s) => {
+      const next = new Set(s.openWindowIds)
+      if (open) next.add(id)
+      else next.delete(id)
+      return { openWindowIds: next }
+    }),
+
   loadNotes: async () => {
     set({ isLoading: true })
-    const notes = await window.api.note.getAll()
-    set({ notes, isLoading: false, selectedId: notes[0]?.id ?? null })
+    const [notes, openIds] = await Promise.all([
+      window.api.note.getAll(),
+      window.api.note.getOpenWindows(),
+    ])
+    set({ notes, isLoading: false, selectedId: notes[0]?.id ?? null, openWindowIds: new Set(openIds) })
   },
 
   createNote: async (payload) => {
@@ -35,13 +51,11 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   },
 
   updateNote: async (id, payload) => {
-    // 즉시 UI에 반영 (optimistic update)
     set((s) => ({
       notes: s.notes.map((n) =>
         n.id === id ? { ...n, ...payload, updatedAt: new Date().toISOString() } : n
       ),
     }))
-    // DB 동기화
     const updated = await window.api.note.update(id, payload)
     if (!updated) return
     set((s) => ({
@@ -54,12 +68,23 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     set((s) => {
       const notes = s.notes.filter((n) => n.id !== id)
       const selectedId = s.selectedId === id ? (notes[0]?.id ?? null) : s.selectedId
-      return { notes, selectedId }
+      const openWindowIds = new Set(s.openWindowIds)
+      openWindowIds.delete(id)
+      return { notes, selectedId, openWindowIds }
     })
+  },
+
+  duplicateNote: async (noteId) => {
+    const note = await window.api.note.duplicate(noteId)
+    return note
   },
 
   openNoteWindow: async (noteId) => {
     await window.api.note.openWindow(noteId)
+  },
+
+  toggleNoteWindow: async (noteId) => {
+    await window.api.note.toggleWindow(noteId)
   },
 
   _addNote: (note) =>

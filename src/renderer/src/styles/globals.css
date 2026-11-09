@@ -12,6 +12,50 @@
   }
 }
 
+/* ── 테마 CSS 변수 ─────────────────────────────────────────── */
+
+/* 기본값: 다크 네이비 */
+:root {
+  --app-main:        #16213e;
+  --app-sidebar:     #1a1a2e;
+  --app-border:      rgba(255,255,255,0.05);
+  --app-text:        rgba(255,255,255,0.85);
+  --app-text-muted:  rgba(255,255,255,0.4);
+  --app-text-dim:    rgba(255,255,255,0.25);
+  --app-hover:       rgba(255,255,255,0.05);
+  --app-active:      rgba(255,255,255,0.12);
+  --app-select:      rgba(181,160,122,0.3);
+  --app-placeholder: rgba(255,255,255,0.2);
+}
+
+/* 다크 테마 색상 */
+[data-theme-mode="dark"][data-theme-color="navy"]     { --app-main: #16213e; --app-sidebar: #1a1a2e; }
+[data-theme-mode="dark"][data-theme-color="midnight"] { --app-main: #0d0d1a; --app-sidebar: #111118; }
+[data-theme-mode="dark"][data-theme-color="ocean"]    { --app-main: #0a1929; --app-sidebar: #071520; }
+[data-theme-mode="dark"][data-theme-color="forest"]   { --app-main: #0d1f0f; --app-sidebar: #091a0c; }
+[data-theme-mode="dark"][data-theme-color="rose"]     { --app-main: #1a0c0e; --app-sidebar: #140a0b; }
+[data-theme-mode="dark"][data-theme-color="slate"]    { --app-main: #18181b; --app-sidebar: #111113; }
+
+/* 라이트 테마 공통 */
+[data-theme-mode="light"] {
+  --app-border:      rgba(0,0,0,0.07);
+  --app-text:        rgba(0,0,0,0.85);
+  --app-text-muted:  rgba(0,0,0,0.45);
+  --app-text-dim:    rgba(0,0,0,0.25);
+  --app-hover:       rgba(0,0,0,0.04);
+  --app-active:      rgba(0,0,0,0.09);
+  --app-select:      rgba(100,116,139,0.15);
+  --app-placeholder: rgba(0,0,0,0.3);
+}
+
+/* 라이트 테마 색상 */
+[data-theme-mode="light"][data-theme-color="navy"]     { --app-main: #f0f4f8; --app-sidebar: #e2e8f0; }
+[data-theme-mode="light"][data-theme-color="midnight"] { --app-main: #f5f5f5; --app-sidebar: #e8e8e8; }
+[data-theme-mode="light"][data-theme-color="ocean"]    { --app-main: #f0f7f9; --app-sidebar: #e0eef3; }
+[data-theme-mode="light"][data-theme-color="forest"]   { --app-main: #f2f7f2; --app-sidebar: #e4efe4; }
+[data-theme-mode="light"][data-theme-color="rose"]     { --app-main: #faf4f4; --app-sidebar: #f0e8e8; }
+[data-theme-mode="light"][data-theme-color="slate"]    { --app-main: #f8f8f8; --app-sidebar: #ebebeb; }
+
 /* Note color themes */
 @layer components {
   .note-yellow  { --note-bg: #fef9c3; --note-header: #fde047; --note-text: #1c1917; }
@@ -35,6 +79,8 @@
 
 .tiptap p { margin: 0 0 0.25rem; }
 .tiptap ul, .tiptap ol { padding-left: 1.25rem; margin: 0.25rem 0; }
+.tiptap ul:not([data-type="taskList"]) { list-style: disc; }
+.tiptap ol { list-style: decimal; }
 .tiptap h1 { font-size: 1.5rem; font-weight: 700; margin: 0.5rem 0 0.25rem; }
 .tiptap h2 { font-size: 1.25rem; font-weight: 600; margin: 0.4rem 0 0.2rem; }
 .tiptap h3 { font-size: 1.1rem; font-weight: 600; margin: 0.3rem 0 0.1rem; }
@@ -67,7 +113,25 @@
   color: rgba(255,255,255,0.2);
 }
 
-/* Custom scrollbar */
+/* Placeholder — theme-variable based */
+.themed-editor .tiptap p.is-editor-empty:first-child::before {
+  color: var(--app-placeholder);
+}
+
+/* TextStyle font-size passthrough */
+.tiptap span[style*="font-size"] { line-height: 1.4; }
+
+/* Highlight */
+.tiptap mark { border-radius: 2px; padding: 0 1px; }
+
+/* Custom scrollbar — hidden by default, visible on overflow */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: transparent; border-radius: 2px; }
+
+/* Show scrollbar only when the container is being scrolled or hovered */
+*:hover::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,0.45); }
+
+/* Sidebar note list — always show when overflowing */
+.sidebar-list::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.35); }

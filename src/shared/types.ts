@@ -1,5 +1,9 @@
 export type NoteColor = 'yellow' | 'blue' | 'green' | 'pink' | 'purple' | 'white'
 export type FontSize = 'sm' | 'md' | 'lg'
+export type ThemeMode = 'dark' | 'light'
+export type ThemeColor = 'navy' | 'midnight' | 'ocean' | 'forest' | 'rose' | 'slate'
+export type StartBehavior = 'tray' | 'main'
+export type SortBy = 'updatedAt' | 'createdAt' | 'color'
 
 export interface NotePosition {
   x: number
@@ -24,6 +28,13 @@ export interface Note {
   updatedAt: string
 }
 
+export interface AppSettings {
+  themeMode: ThemeMode
+  themeColor: ThemeColor
+  startBehavior: StartBehavior
+  spellCheck: boolean
+}
+
 export interface CreateNotePayload {
   color?: NoteColor
   position?: NotePosition
@@ -41,15 +52,22 @@ export interface UpdateNotePayload {
 
 // IPC channel names — single source of truth
 export const IPC = {
-  NOTE_GET_ALL: 'note:getAll',
-  NOTE_CREATE: 'note:create',
-  NOTE_UPDATE: 'note:update',
-  NOTE_DELETE: 'note:delete',
-  NOTE_OPEN_WINDOW: 'note:openWindow',
-  NOTE_CLOSE_WINDOW: 'note:closeWindow',
-  WINDOW_SET_PIN: 'window:setPin',
-  WINDOW_MINIMIZE: 'window:minimize',
-  APP_QUIT: 'app:quit',
-  APP_SHOW_MAIN: 'app:showMain',
-  THEME_CHANGED: 'theme:changed',
+  NOTE_GET_ALL:       'note:getAll',
+  NOTE_CREATE:        'note:create',
+  NOTE_UPDATE:        'note:update',
+  NOTE_DELETE:        'note:delete',
+  NOTE_OPEN_WINDOW:   'note:openWindow',
+  NOTE_CLOSE_WINDOW:  'note:closeWindow',
+  NOTE_DUPLICATE:        'note:duplicate',
+  NOTE_GET_OPEN_WINDOWS: 'note:getOpenWindows',
+  NOTE_TOGGLE_WINDOW:    'note:toggleWindow',
+  NOTE_EXPORT_TXT:    'note:exportTxt',
+  NOTE_EXPORT_ALL:    'note:exportAll',
+  WINDOW_SET_PIN:     'window:setPin',
+  WINDOW_MINIMIZE:    'window:minimize',
+  APP_QUIT:           'app:quit',
+  APP_SHOW_MAIN:      'app:showMain',
+  SETTINGS_GET:       'settings:get',
+  SETTINGS_UPDATE:    'settings:update',
+  THEME_CHANGED:      'theme:changed',
 } as const

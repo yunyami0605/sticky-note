@@ -5,11 +5,14 @@ import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Placeholder from '@tiptap/extension-placeholder'
 import Heading from '@tiptap/extension-heading'
-import type { Note, UpdateNotePayload, NoteColor, FontSize } from '../../../../shared/types'
+import { TextStyle, FontFamily, FontSize, Color } from '@tiptap/extension-text-style'
+import { Highlight } from '@tiptap/extension-highlight'
+import type { Note, UpdateNotePayload, NoteColor, FontSize as NoteFontSize } from '../../../../shared/types'
+import { useSettingsStore } from '../../store/settingsStore'
 import { Toolbar } from '../Toolbar'
 import { ColorPicker } from '../ColorPicker'
 
-const FONT_SIZE_CLASS: Record<FontSize, string> = {
+const FONT_SIZE_CLASS: Record<NoteFontSize, string> = {
   sm: 'text-sm',
   md: 'text-base',
   lg: 'text-lg',
@@ -22,6 +25,9 @@ interface Props {
 
 export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { spellCheck, load: loadSettings } = useSettingsStore()
+
+  useEffect(() => { loadSettings() }, [])
 
   const persistUpdate = useCallback((payload: UpdateNotePayload): void => {
     // DB 저장 + 로컬 state 즉시 반영
@@ -37,6 +43,11 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
       TaskList,
       TaskItem.configure({ nested: true }),
       Placeholder.configure({ placeholder: '메모를 입력하세요...' }),
+      TextStyle,
+      FontFamily,
+      FontSize,
+      Color,
+      Highlight.configure({ multicolor: true }),
     ],
     content: note.content ? JSON.parse(note.content) : '',
     onUpdate: ({ editor }) => {
@@ -78,7 +89,7 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
   }
 
   const cycleFontSize = (): void => {
-    const sizes: FontSize[] = ['sm', 'md', 'lg']
+    const sizes: NoteFontSize[] = ['sm', 'md', 'lg']
     const fontSize = sizes[(sizes.indexOf(note.fontSize) + 1) % sizes.length]
     onNoteChange({ ...note, fontSize })
     window.api.note.update(note.id, { fontSize })
@@ -133,7 +144,7 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
 
       {/* editor area */}
       <div className={`flex-1 overflow-y-auto px-3 py-2 ${FONT_SIZE_CLASS[note.fontSize]}`}>
-        <EditorContent editor={editor} className="tiptap h-full" />
+        <EditorContent editor={editor} className="tiptap h-full" spellCheck={spellCheck} />
       </div>
 
       {/* toolbar */}

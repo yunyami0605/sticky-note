@@ -2,7 +2,7 @@ import Database from 'better-sqlite3'
 import { app } from 'electron'
 import path from 'path'
 import { v4 as uuidv4 } from 'uuid'
-import type { Note, CreateNotePayload, UpdateNotePayload, NoteColor } from '../../shared/types'
+import type { Note, CreateNotePayload, UpdateNotePayload, NoteColor, AppSettings, ThemeMode, ThemeColor, StartBehavior } from '../../shared/types'
 
 const DEFAULT_SIZE = { width: 280, height: 320 }
 const DEFAULT_COLOR: NoteColor = 'yellow'
@@ -29,6 +29,13 @@ export function initDatabase(): void {
       font_size  TEXT NOT NULL DEFAULT 'md',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
+    )
+  `)
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
     )
   `)
 }
@@ -133,4 +140,80 @@ export function updateNote(id: string, payload: UpdateNotePayload): Note | null 
 export function deleteNote(id: string): boolean {
   const result = db.prepare('DELETE FROM notes WHERE id = ?').run(id)
   return result.changes > 0
+}
+
+// ── Settings ──────────────────────────────────────────────────
+
+export function getSettings(): AppSettings {
+  const rows = db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[]
+  const map: Record<string, string> = Object.fromEntries(rows.map((r) => [r.key, r.value]))
+  return {
+    themeMode: (map['themeMode'] ?? 'dark') as ThemeMode,
+    themeColor: (map['themeColor'] ?? 'navy') as ThemeColor,
+    startBehavior: (map['startBehavior'] ?? 'main') as StartBehavior,
+    spellCheck: map['spellCheck'] === 'true',
+  }
+}
+
+export function updateSettings(partial: Partial<AppSettings>): AppSettings {
+  const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
+  for (const [key, value] of Object.entries(partial)) {
+    if (value !== undefined) stmt.run(key, String(value))
+  }
+  return getSettings()
+}
+
+// ── TXT export helpers ────────────────────────────────────────
+
+type TipNode = { type?: string; text?: string; content?: TipNode[]; attrs?: Record<string, unknown> }
+
+function nodeToText(node: TipNode, listIndex?: number): string {
+  if (node.type === 'text') return node.text ?? ''
+  if (node.type === 'hardBreak') return '\n'
+
+  const children = (node.content ?? []).map((c, i) => nodeToText(c, i + 1)).join('')
+
+  switch (node.type) {
+    case 'doc':       return children
+    case 'paragraph': return children + '\n'
+    case 'heading': {
+      const level = (node.attrs?.level as number) ?? 1
+      return '#'.repeat(level) + ' ' + children + '\n'
+    }
+    case 'bulletList':  return children
+    case 'orderedList': return children
+    case 'listItem':    return `• ${children.trimStart()}`
+    case 'taskList':    return children
+    case 'taskItem':    return `[${node.attrs?.checked ? 'x' : ' '}] ${children.trimStart()}`
+    case 'blockquote':  return children.split('\n').map((l) => `> ${l}`).join('\n') + '\n'
+    case 'codeBlock':   return '```\n' + children + '```\n'
+    default:            return children
+  }
+}
+
+export function noteToPlainText(content: string): string {
+  if (!content) return ''
+  try {
+    const doc = JSON.parse(content) as TipNode
+    // also extract ordered list numbers by tracking index per parent
+    return nodeToText(doc).replace(/\n{3,}/g, '\n\n').trim()
+  } catch {
+    return content
+  }
+}
+
+export function getNoteTitle(content: string): string {
+  if (!content) return '메모'
+  try {
+    const doc = JSON.parse(content) as TipNode
+    const texts: string[] = []
+    const walk = (n: TipNode): void => {
+      if (n.text) texts.push(n.text)
+      n.content?.forEach(walk)
+    }
+    doc.content?.forEach(walk)
+    return texts.join(' ').trim().slice(0, 60) || '메모'
+  } catch {
+    return '메모'
+  }
 }

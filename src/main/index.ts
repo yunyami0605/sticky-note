@@ -1,9 +1,13 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell, session } from 'electron'
 import path from 'path'
+import fs from 'fs'
 import { is } from '@electron-toolkit/utils'
-import { initDatabase, getAllNotes, createNote, updateNote, deleteNote } from './services/database'
+import {
+  initDatabase, getAllNotes, createNote, updateNote, deleteNote,
+  getSettings, updateSettings, noteToPlainText, getNoteTitle,
+} from './services/database'
 import { IPC } from '../shared/types'
-import type { CreateNotePayload, UpdateNotePayload } from '../shared/types'
+import type { CreateNotePayload, UpdateNotePayload, AppSettings } from '../shared/types'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -41,7 +45,9 @@ function createMainWindow(): BrowserWindow {
 function createNoteWindow(noteId: string): BrowserWindow {
   const existing = noteWindows.get(noteId)
   if (existing && !existing.isDestroyed()) {
+    existing.show()
     existing.focus()
+    mainWindow?.webContents.send('note:windowOpened', noteId)
     return existing
   }
 
@@ -87,8 +93,10 @@ function createNoteWindow(noteId: string): BrowserWindow {
 
   win.on('closed', () => {
     noteWindows.delete(noteId)
+    mainWindow?.webContents.send('note:windowClosed', noteId)
   })
 
+  mainWindow?.webContents.send('note:windowOpened', noteId)
   return win
 }
 
@@ -122,7 +130,6 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.NOTE_CREATE, (_e, payload: CreateNotePayload) => {
     const note = createNote(payload ?? {})
     createNoteWindow(note.id)
-    // 렌더러가 invoke로 요청한 경우 — 프로미스 응답으로 충분하므로 push 이벤트 불필요
     return note
   })
 
@@ -132,9 +139,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.NOTE_DELETE, (_e, id: string) => {
     const win = noteWindows.get(id)
-    if (win && !win.isDestroyed()) {
-      win.destroy()
-    }
+    if (win && !win.isDestroyed()) win.destroy()
     noteWindows.delete(id)
     const result = deleteNote(id)
     mainWindow?.webContents.send('note:deleted', id)
@@ -147,9 +152,98 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.NOTE_CLOSE_WINDOW, (_e, noteId: string) => {
     const win = noteWindows.get(noteId)
-    if (win && !win.isDestroyed()) win.hide()
+    if (win && !win.isDestroyed()) {
+      win.hide()
+      mainWindow?.webContents.send('note:windowClosed', noteId)
+    }
   })
 
+  ipcMain.handle(IPC.NOTE_DUPLICATE, (_e, noteId: string) => {
+    const notes = getAllNotes()
+    const src = notes.find((n) => n.id === noteId)
+    if (!src) return null
+    const note = createNote({
+      color: src.color,
+      position: { x: (src.position.x ?? 100) + 24, y: (src.position.y ?? 100) + 24 },
+    })
+    const updated = updateNote(note.id, {
+      content: src.content,
+      fontSize: src.fontSize,
+      opacity: src.opacity,
+      size: src.size,
+    })
+    createNoteWindow(note.id)
+    mainWindow?.webContents.send('note:created', updated ?? note)
+    return updated ?? note
+  })
+
+  ipcMain.handle(IPC.NOTE_GET_OPEN_WINDOWS, () => {
+    const openIds: string[] = []
+    noteWindows.forEach((win, id) => {
+      if (!win.isDestroyed() && win.isVisible()) openIds.push(id)
+    })
+    return openIds
+  })
+
+  ipcMain.handle(IPC.NOTE_TOGGLE_WINDOW, (_e, noteId: string) => {
+    const win = noteWindows.get(noteId)
+    if (win && !win.isDestroyed()) {
+      if (win.isVisible()) {
+        win.hide()
+        mainWindow?.webContents.send('note:windowClosed', noteId)
+        return false
+      } else {
+        win.show()
+        win.focus()
+        mainWindow?.webContents.send('note:windowOpened', noteId)
+        return true
+      }
+    }
+    createNoteWindow(noteId)
+    return true
+  })
+
+  // ── 단일 메모 TXT 내보내기 ────────────────────────────────
+  ipcMain.handle(IPC.NOTE_EXPORT_TXT, async (_e, noteId: string) => {
+    const notes = getAllNotes()
+    const note = notes.find((n) => n.id === noteId)
+    if (!note) return { success: false, error: '메모를 찾을 수 없습니다.' }
+
+    const title = getNoteTitle(note.content)
+    const safeName = title.replace(/[/\\?%*:|"<>]/g, '_')
+
+    const { filePath } = await dialog.showSaveDialog({
+      title: '메모 내보내기',
+      defaultPath: `${safeName}.txt`,
+      filters: [{ name: 'Text File', extensions: ['txt'] }],
+    })
+    if (!filePath) return { success: false }
+
+    fs.writeFileSync(filePath, noteToPlainText(note.content), 'utf-8')
+    shell.showItemInFolder(filePath)
+    return { success: true, filePath }
+  })
+
+  // ── 전체 메모 TXT 내보내기 ────────────────────────────────
+  ipcMain.handle(IPC.NOTE_EXPORT_ALL, async () => {
+    const { filePaths } = await dialog.showOpenDialog({
+      title: '저장 폴더 선택',
+      properties: ['openDirectory', 'createDirectory'],
+    })
+    if (!filePaths?.[0]) return { success: false }
+
+    const notes = getAllNotes()
+    for (const note of notes) {
+      const title = getNoteTitle(note.content)
+      const safeName = title.replace(/[/\\?%*:|"<>]/g, '_') || note.id.slice(0, 8)
+      const filePath = path.join(filePaths[0], `${safeName}.txt`)
+      fs.writeFileSync(filePath, noteToPlainText(note.content), 'utf-8')
+    }
+    shell.openPath(filePaths[0])
+    return { success: true, count: notes.length }
+  })
+
+  // ── 창 제어 ───────────────────────────────────────────────
   ipcMain.handle(IPC.WINDOW_SET_PIN, (_e, noteId: string, pinned: boolean) => {
     const win = noteWindows.get(noteId)
     if (win && !win.isDestroyed()) win.setAlwaysOnTop(pinned)
@@ -163,15 +257,34 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.APP_SHOW_MAIN, () => {
     mainWindow?.show()
   })
+
+  // ── 설정 ─────────────────────────────────────────────────
+  ipcMain.handle(IPC.SETTINGS_GET, () => getSettings())
+
+  ipcMain.handle(IPC.SETTINGS_UPDATE, (_e, partial: Partial<AppSettings>) => {
+    return updateSettings(partial)
+  })
 }
 
 app.whenReady().then(() => {
   initDatabase()
   registerIpcHandlers()
+
+  // Windows 한국어 맞춤법 검사: 시스템 언어팩 활용 (Method 1)
+  // macOS는 OS 레벨에서 자동 처리되므로 별도 설정 불필요
+  if (process.platform === 'win32') {
+    session.defaultSession.setSpellCheckerLanguages(['ko-KR', 'en-US'])
+  }
+
+  const settings = getSettings()
+
   mainWindow = createMainWindow()
+  if (settings.startBehavior === 'tray') {
+    mainWindow.hide()
+  }
+
   setupTray()
 
-  // Reopen all notes that were open at last session
   const notes = getAllNotes()
   for (const note of notes) {
     createNoteWindow(note.id)
@@ -186,7 +299,6 @@ app.on('activate', () => {
   mainWindow?.show()
 })
 
-// Suppress default menu on Windows/Linux
 if (process.platform !== 'darwin') {
   app.applicationMenu = null
 }
