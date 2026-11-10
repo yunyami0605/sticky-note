@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import TaskList from '@tiptap/extension-task-list'
@@ -20,7 +20,7 @@ import { SettingsPanel } from '../SettingsPanel'
 import { Callout } from '../../extensions/Callout'
 import { SlashCommand } from '../../extensions/SlashCommand'
 import { Mention, MentionNode } from '../../extensions/Mention'
-import type { SortBy } from '../../../../shared/types'
+import type { Note, SortBy } from '../../../../shared/types'
 
 const lowlight = createLowlight(common)
 
@@ -147,40 +147,16 @@ function SortDropdown({ sortBy, onChange }: { sortBy: SortBy; onChange: (s: Sort
   )
 }
 
-// ── 폴더 패널 ──────────────────────────────────────────────────
+// ── 태그 필터 / 관리 ───────────────────────────────────────────
 const TAG_COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#8b5cf6','#ec4899','#6b7280']
 
-function FolderPanel({ notes, isDark }: { notes: { folderId: string | null }[]; isDark: boolean }): JSX.Element {
-  const { folders, selectedFolderId, selectFolder, createFolder, renameFolder, deleteFolder, load } = useFolderStore()
-  const { tags, selectedTagId, selectTag, createTag, deleteTag, load: loadTags } = useTagStore()
-  const [newFolderName, setNewFolderName] = useState('')
-  const [addingFolder, setAddingFolder] = useState(false)
-  const [renamingId, setRenamingId] = useState<string | null>(null)
-  const [renameValue, setRenameValue] = useState('')
+function TagSection({ isDark }: { isDark: boolean }): JSX.Element {
+  const { tags, selectedTagId, selectTag, createTag, deleteTag, load } = useTagStore()
   const [addingTag, setAddingTag] = useState(false)
   const [newTagName, setNewTagName] = useState('')
   const [newTagColor, setNewTagColor] = useState(TAG_COLORS[4])
 
-  useEffect(() => { load(); loadTags() }, [load, loadTags])
-
-  const folderCount = (folderId: string | null): number =>
-    notes.filter((n) => n.folderId === folderId).length
-
-  const allCount = notes.length
-
-  const handleAddFolder = async (): Promise<void> => {
-    const name = newFolderName.trim()
-    if (!name) return
-    await createFolder(name)
-    setNewFolderName('')
-    setAddingFolder(false)
-  }
-
-  const handleRename = async (id: string): Promise<void> => {
-    const name = renameValue.trim()
-    if (name) await renameFolder(id, name)
-    setRenamingId(null)
-  }
+  useEffect(() => { load() }, [load])
 
   const handleAddTag = async (): Promise<void> => {
     const name = newTagName.trim()
@@ -190,133 +166,33 @@ function FolderPanel({ notes, isDark }: { notes: { folderId: string | null }[]; 
     setAddingTag(false)
   }
 
-  const folderRowStyle = (active: boolean): React.CSSProperties => ({
-    backgroundColor: active ? 'var(--app-active)' : 'transparent',
-    color: active ? 'var(--app-text)' : 'var(--app-text-muted)',
-  })
-
   return (
-    <div className="border-b flex-shrink-0" style={{ borderColor: 'var(--app-border)' }}>
-      {/* 전체 */}
-      <button
-        className="flex items-center justify-between w-full px-3 py-1.5 text-xs transition-colors"
-        style={folderRowStyle(selectedFolderId === null && !useTagStore.getState().selectedTagId)}
-        onClick={() => { selectFolder(null); selectTag(null) }}
-      >
-        <span className="flex items-center gap-1.5">
-          <span>📋</span> 전체
-        </span>
-        <span className="text-[10px] opacity-50">{allCount}</span>
-      </button>
-
-      {/* 미분류 */}
-      <button
-        className="flex items-center justify-between w-full px-3 py-1.5 text-xs transition-colors"
-        style={folderRowStyle(selectedFolderId === 'uncategorized')}
-        onClick={() => { selectFolder('uncategorized'); selectTag(null) }}
-      >
-        <span className="flex items-center gap-1.5">
-          <span>📄</span> 미분류
-        </span>
-        <span className="text-[10px] opacity-50">{folderCount(null)}</span>
-      </button>
-
-      {/* 사용자 폴더 */}
-      {folders.map((folder) => (
-        <div key={folder.id} className="group flex items-center">
-          {renamingId === folder.id ? (
-            <input
-              autoFocus
-              className="flex-1 mx-2 my-1 px-2 py-0.5 text-xs rounded outline-none"
-              style={{ backgroundColor: 'var(--app-hover)', color: 'var(--app-text)' }}
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              onBlur={() => handleRename(folder.id)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleRename(folder.id)
-                if (e.key === 'Escape') setRenamingId(null)
-              }}
-            />
-          ) : (
-            <button
-              className="flex items-center justify-between flex-1 px-3 py-1.5 text-xs transition-colors"
-              style={folderRowStyle(selectedFolderId === folder.id)}
-              onClick={() => { selectFolder(folder.id); selectTag(null) }}
-              onDoubleClick={() => { setRenamingId(folder.id); setRenameValue(folder.name) }}
-            >
-              <span className="flex items-center gap-1.5 min-w-0">
-                <span>📁</span>
-                <span className="truncate">{folder.name}</span>
-              </span>
-              <span className="text-[10px] opacity-50">{folderCount(folder.id)}</span>
-            </button>
-          )}
-          <button
-            className="opacity-0 group-hover:opacity-60 hover:!opacity-100 mr-1.5 text-[10px] flex-shrink-0 transition-opacity"
-            style={{ color: 'var(--app-text-muted)' }}
-            onClick={() => deleteFolder(folder.id)}
-            title="폴더 삭제"
-          >
-            ×
-          </button>
-        </div>
-      ))}
-
-      {/* 새 폴더 입력 */}
-      {addingFolder ? (
-        <div className="px-2 py-1">
-          <input
-            autoFocus
-            className="w-full px-2 py-0.5 text-xs rounded outline-none"
-            style={{ backgroundColor: 'var(--app-hover)', color: 'var(--app-text)' }}
-            placeholder="폴더 이름..."
-            value={newFolderName}
-            onChange={(e) => setNewFolderName(e.target.value)}
-            onBlur={() => { handleAddFolder(); setAddingFolder(false) }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleAddFolder()
-              if (e.key === 'Escape') setAddingFolder(false)
-            }}
-          />
-        </div>
-      ) : (
-        <button
-          className="flex items-center gap-1 w-full px-3 py-1.5 text-[10px] transition-opacity hover:opacity-80"
-          style={{ color: 'var(--app-text-dim)' }}
-          onClick={() => setAddingFolder(true)}
-        >
-          + 폴더 추가
-        </button>
-      )}
-
-      {/* 태그 필터 */}
+    <div className="border-t px-2 py-2 flex-shrink-0" style={{ borderColor: 'var(--app-border)' }}>
       {tags.length > 0 && (
-        <div className="px-3 py-1.5 border-t" style={{ borderColor: 'var(--app-border)' }}>
-          <div className="flex flex-wrap gap-1">
-            {tags.map((tag) => (
-              <button
-                key={tag.id}
-                onClick={() => { selectTag(selectedTagId === tag.id ? null : tag.id); selectFolder(null) }}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] transition-all"
-                style={{
-                  backgroundColor: selectedTagId === tag.id ? tag.color : `${tag.color}22`,
-                  color: selectedTagId === tag.id
-                    ? '#fff'
-                    : (isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)'),
-                  border: `1px solid ${tag.color}66`,
-                }}
-              >
-                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
-                {tag.name}
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-wrap gap-1 mb-1.5">
+          {tags.map((tag) => (
+            <button
+              key={tag.id}
+              onClick={() => selectTag(selectedTagId === tag.id ? null : tag.id)}
+              className="group flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] transition-all"
+              style={{
+                backgroundColor: selectedTagId === tag.id ? tag.color : `${tag.color}22`,
+                color: selectedTagId === tag.id ? '#fff' : (isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)'),
+                border: `1px solid ${tag.color}66`,
+              }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
+              {tag.name}
+              <span
+                className="opacity-0 group-hover:opacity-60 hover:!opacity-100 ml-0.5"
+                onMouseDown={(e) => { e.stopPropagation(); deleteTag(tag.id) }}
+              >×</span>
+            </button>
+          ))}
         </div>
       )}
-
-      {/* 태그 추가 */}
       {addingTag ? (
-        <div className="px-2 py-1.5 border-t flex flex-col gap-1" style={{ borderColor: 'var(--app-border)' }}>
+        <div className="flex flex-col gap-1">
           <input
             autoFocus
             className="w-full px-2 py-0.5 text-xs rounded outline-none"
@@ -334,12 +210,8 @@ function FolderPanel({ notes, isDark }: { notes: { folderId: string | null }[]; 
               <button
                 key={c}
                 onClick={() => setNewTagColor(c)}
-                className="w-4 h-4 rounded-full"
-                style={{
-                  backgroundColor: c,
-                  outline: newTagColor === c ? `2px solid ${c}` : 'none',
-                  outlineOffset: 1,
-                }}
+                className="w-3.5 h-3.5 rounded-full"
+                style={{ backgroundColor: c, outline: newTagColor === c ? `2px solid ${c}` : 'none', outlineOffset: 1 }}
               />
             ))}
           </div>
@@ -348,25 +220,304 @@ function FolderPanel({ notes, isDark }: { notes: { folderId: string | null }[]; 
               className="flex-1 text-[10px] py-0.5 rounded"
               style={{ backgroundColor: 'var(--app-active)', color: 'var(--app-text)' }}
               onClick={handleAddTag}
-            >
-              추가
-            </button>
+            >추가</button>
             <button
               className="text-[10px] py-0.5 px-2 rounded"
               style={{ color: 'var(--app-text-muted)' }}
               onClick={() => setAddingTag(false)}
-            >
-              취소
-            </button>
+            >취소</button>
           </div>
         </div>
       ) : (
         <button
-          className="flex items-center gap-1 w-full px-3 py-1 text-[10px] transition-opacity hover:opacity-80"
-          style={{ color: 'var(--app-text-dim)', borderTop: `1px solid var(--app-border)` }}
+          className="flex items-center gap-1 text-[10px] transition-opacity hover:opacity-80"
+          style={{ color: 'var(--app-text-dim)' }}
           onClick={() => setAddingTag(true)}
         >
           + 태그 추가
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ── 사이드바 트리 ─────────────────────────────────────────────
+function getTitle(content: string): string {
+  if (!content) return '메모'
+  try {
+    const parsed = JSON.parse(content)
+    const texts: string[] = []
+    const walk = (node: { text?: string; content?: unknown[] }): void => {
+      if (node.text) texts.push(node.text)
+      node.content?.forEach((c) => walk(c as typeof node))
+    }
+    parsed.content?.forEach((n: unknown) => walk(n as { text?: string; content?: unknown[] }))
+    return texts.join(' ').trim() || '메모'
+  } catch { return '메모' }
+}
+
+function sortNotes(notes: Note[], sortBy: SortBy): Note[] {
+  const sorted = [...notes]
+  if (sortBy === 'updatedAt') sorted.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  else if (sortBy === 'createdAt') sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  else if (sortBy === 'color') {
+    const ORDER = ['yellow', 'blue', 'green', 'pink', 'purple', 'white']
+    sorted.sort((a, b) => ORDER.indexOf(a.color) - ORDER.indexOf(b.color))
+  }
+  return sorted
+}
+
+interface TreeSectionProps {
+  sectionId: string        // 'uncategorized' | folderId
+  icon: string
+  label: string
+  notes: Note[]
+  expanded: boolean
+  isDark: boolean
+  onToggle: () => void
+  onNewNote: () => void
+  onRename?: () => void
+  onDelete?: () => void
+  renamingContent?: JSX.Element
+}
+
+function TreeSection({
+  icon, label, notes, expanded, isDark, onToggle, onNewNote, onDelete, onRename, renamingContent,
+}: TreeSectionProps): JSX.Element {
+  const { selectedId, setSelectedId, openWindowIds } = useNoteStore()
+
+  return (
+    <div>
+      {/* 섹션 헤더 */}
+      <div className="group flex items-center w-full border-b" style={{ borderColor: 'var(--app-border)' }}>
+        {renamingContent ?? (
+          <button
+            className="flex items-center gap-1.5 flex-1 px-2 py-1.5 text-xs text-left min-w-0"
+            onClick={onToggle}
+            style={{ color: 'var(--app-text-muted)' }}
+          >
+            <span
+              className="text-[7px] flex-shrink-0 transition-transform duration-150"
+              style={{ transform: expanded ? 'rotate(90deg)' : 'none', color: 'var(--app-text-dim)' }}
+            >▶</span>
+            <span className="flex-shrink-0">{icon}</span>
+            <span className="flex-1 truncate font-medium text-[11px]">{label}</span>
+            <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--app-text-dim)' }}>{notes.length}</span>
+          </button>
+        )}
+        <div
+          className="opacity-0 group-hover:opacity-100 flex items-center pr-1.5 gap-0.5 flex-shrink-0 transition-opacity"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); onNewNote() }}
+            className="w-5 h-5 flex items-center justify-center rounded hover:opacity-70 text-sm leading-none"
+            style={{ color: 'var(--app-text-dim)' }}
+            title="이 폴더에 메모 추가"
+          >+</button>
+          {onRename && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onRename() }}
+              className="w-5 h-5 flex items-center justify-center rounded hover:opacity-70 text-[10px]"
+              style={{ color: 'var(--app-text-dim)' }}
+              title="이름 변경"
+            >✎</button>
+          )}
+          {onDelete && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete() }}
+              className="w-5 h-5 flex items-center justify-center rounded hover:opacity-70 text-[10px]"
+              style={{ color: 'var(--app-text-dim)' }}
+              title="폴더 삭제"
+            >×</button>
+          )}
+        </div>
+      </div>
+
+      {/* 메모 목록 */}
+      {expanded && (
+        <div>
+          {notes.length === 0 ? (
+            <div
+              className="pl-6 py-2 text-[10px]"
+              style={{ color: 'var(--app-text-dim)' }}
+            >메모 없음</div>
+          ) : (
+            notes.map((note) => (
+              <NoteCard
+                key={note.id}
+                note={note}
+                isDark={isDark}
+                indent
+              />
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── 사이드바 트리 전체 ─────────────────────────────────────────
+function SidebarTree({
+  searchQuery,
+  sortBy,
+  isDark,
+}: {
+  searchQuery: string
+  sortBy: SortBy
+  isDark: boolean
+}): JSX.Element {
+  const { notes, createNote } = useNoteStore()
+  const { folders, load, createFolder, renameFolder, deleteFolder } = useFolderStore()
+  const { selectedTagId, noteTagMap, loadNoteTagIds } = useTagStore()
+
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(['uncategorized']))
+  const [addingFolder, setAddingFolder] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+
+  useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    notes.forEach((n) => { if (!noteTagMap[n.id]) loadNoteTagIds(n.id) })
+  }, [notes, noteTagMap, loadNoteTagIds])
+
+  const toggle = useCallback((id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  // 태그 + 검색 필터
+  const filtered = useMemo(() => {
+    let ns = [...notes]
+    if (selectedTagId) {
+      ns = ns.filter((n) => (noteTagMap[n.id] ?? []).includes(selectedTagId))
+    }
+    const q = searchQuery.trim().toLowerCase()
+    if (q) {
+      ns = ns.filter((n) => {
+        try {
+          const parsed = JSON.parse(n.content)
+          const texts: string[] = []
+          const walk = (node: { text?: string; content?: unknown[] }): void => {
+            if (node.text) texts.push(node.text)
+            node.content?.forEach((c) => walk(c as typeof node))
+          }
+          parsed.content?.forEach((nd: unknown) => walk(nd as { text?: string; content?: unknown[] }))
+          return texts.join(' ').toLowerCase().includes(q)
+        } catch { return n.content.toLowerCase().includes(q) }
+      })
+    }
+    return ns
+  }, [notes, selectedTagId, noteTagMap, searchQuery])
+
+  const uncategorized = useMemo(() => sortNotes(filtered.filter((n) => !n.folderId), sortBy), [filtered, sortBy])
+  const folderNotes = useCallback(
+    (folderId: string) => sortNotes(filtered.filter((n) => n.folderId === folderId), sortBy),
+    [filtered, sortBy]
+  )
+
+  // 검색 중이면 자동으로 모든 섹션 펼치기
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const ids = new Set(['uncategorized', ...folders.map((f) => f.id)])
+      setExpandedIds(ids)
+    }
+  }, [searchQuery, folders])
+
+  const handleAddFolder = async (): Promise<void> => {
+    const name = newFolderName.trim()
+    if (!name) return
+    const folder = await createFolder(name)
+    setNewFolderName('')
+    setAddingFolder(false)
+    setExpandedIds((prev) => new Set([...prev, folder.id]))
+  }
+
+  const handleRename = async (id: string): Promise<void> => {
+    const name = renameValue.trim()
+    if (name) await renameFolder(id, name)
+    setRenamingId(null)
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto sidebar-list">
+      {/* 미분류 */}
+      <TreeSection
+        sectionId="uncategorized"
+        icon="📄"
+        label="미분류"
+        notes={uncategorized}
+        expanded={expandedIds.has('uncategorized')}
+        isDark={isDark}
+        onToggle={() => toggle('uncategorized')}
+        onNewNote={() => { createNote({ folderId: null }); setExpandedIds((p) => new Set([...p, 'uncategorized'])) }}
+      />
+
+      {/* 사용자 폴더 */}
+      {folders.map((folder) => {
+        const isRenaming = renamingId === folder.id
+        return (
+          <TreeSection
+            key={folder.id}
+            sectionId={folder.id}
+            icon="📁"
+            label={folder.name}
+            notes={folderNotes(folder.id)}
+            expanded={expandedIds.has(folder.id)}
+            isDark={isDark}
+            onToggle={() => toggle(folder.id)}
+            onNewNote={() => { createNote({ folderId: folder.id }); setExpandedIds((p) => new Set([...p, folder.id])) }}
+            onRename={() => { setRenamingId(folder.id); setRenameValue(folder.name) }}
+            onDelete={() => deleteFolder(folder.id)}
+            renamingContent={isRenaming ? (
+              <input
+                autoFocus
+                className="flex-1 mx-2 my-1 px-2 py-0.5 text-xs rounded outline-none"
+                style={{ backgroundColor: 'var(--app-hover)', color: 'var(--app-text)' }}
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onBlur={() => handleRename(folder.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleRename(folder.id)
+                  if (e.key === 'Escape') setRenamingId(null)
+                }}
+              />
+            ) : undefined}
+          />
+        )
+      })}
+
+      {/* 폴더 추가 */}
+      {addingFolder ? (
+        <div className="px-2 py-1.5 border-b" style={{ borderColor: 'var(--app-border)' }}>
+          <input
+            autoFocus
+            className="w-full px-2 py-0.5 text-xs rounded outline-none"
+            style={{ backgroundColor: 'var(--app-hover)', color: 'var(--app-text)' }}
+            placeholder="폴더 이름..."
+            value={newFolderName}
+            onChange={(e) => setNewFolderName(e.target.value)}
+            onBlur={() => { if (!newFolderName.trim()) setAddingFolder(false) }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleAddFolder()
+              if (e.key === 'Escape') { setAddingFolder(false); setNewFolderName('') }
+            }}
+          />
+        </div>
+      ) : (
+        <button
+          className="flex items-center gap-1 w-full px-3 py-1.5 text-[10px] transition-opacity hover:opacity-80 border-b"
+          style={{ color: 'var(--app-text-dim)', borderColor: 'var(--app-border)' }}
+          onClick={() => setAddingFolder(true)}
+        >
+          + 폴더 추가
         </button>
       )}
     </div>
@@ -377,8 +528,6 @@ function FolderPanel({ notes, isDark }: { notes: { folderId: string | null }[]; 
 export function MainPanel(): JSX.Element {
   const { notes, isLoading, loadNotes, createNote, _addNote, _removeNote, setWindowOpen } = useNoteStore()
   const { themeMode, themeColor, loaded, load: loadSettings, shortcuts } = useSettingsStore()
-  const { selectedFolderId } = useFolderStore()
-  const { selectedTagId, noteTagMap, loadNoteTagIds } = useTagStore()
   const isDark = themeMode === 'dark'
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -408,7 +557,7 @@ export function MainPanel(): JSX.Element {
     const handler = (e: KeyboardEvent): void => {
       if (matchShortcut(e, shortcuts.newNote)) {
         e.preventDefault()
-        createNote({ folderId: selectedFolderId === 'uncategorized' ? null : (selectedFolderId ?? null) })
+        createNote({})
       } else if (matchShortcut(e, shortcuts.searchFocus)) {
         e.preventDefault()
         searchInputRef.current?.focus()
@@ -423,62 +572,7 @@ export function MainPanel(): JSX.Element {
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [shortcuts, createNote, selectedFolderId])
-
-  // 노트 태그 일괄 로드
-  useEffect(() => {
-    notes.forEach((n) => {
-      if (!noteTagMap[n.id]) loadNoteTagIds(n.id)
-    })
-  }, [notes, noteTagMap, loadNoteTagIds])
-
-  const displayedNotes = useMemo(() => {
-    let filtered = [...notes]
-
-    // 폴더 필터
-    if (selectedFolderId === 'uncategorized') {
-      filtered = filtered.filter((n) => !n.folderId)
-    } else if (selectedFolderId) {
-      filtered = filtered.filter((n) => n.folderId === selectedFolderId)
-    }
-
-    // 태그 필터
-    if (selectedTagId) {
-      filtered = filtered.filter((n) => (noteTagMap[n.id] ?? []).includes(selectedTagId))
-    }
-
-    // 검색
-    const q = searchQuery.trim().toLowerCase()
-    if (q) {
-      filtered = filtered.filter((n) => {
-        if (!n.content) return false
-        try {
-          const parsed = JSON.parse(n.content)
-          const texts: string[] = []
-          const walk = (node: { text?: string; content?: unknown[] }): void => {
-            if (node.text) texts.push(node.text)
-            node.content?.forEach((c) => walk(c as typeof node))
-          }
-          parsed.content?.forEach((n: unknown) => walk(n as { text?: string; content?: unknown[] }))
-          return texts.join(' ').toLowerCase().includes(q)
-        } catch {
-          return n.content.toLowerCase().includes(q)
-        }
-      })
-    }
-
-    // 정렬
-    if (sortBy === 'updatedAt') {
-      filtered.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    } else if (sortBy === 'createdAt') {
-      filtered.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    } else if (sortBy === 'color') {
-      const ORDER = ['yellow', 'blue', 'green', 'pink', 'purple', 'white']
-      filtered.sort((a, b) => ORDER.indexOf(a.color) - ORDER.indexOf(b.color))
-    }
-
-    return filtered
-  }, [notes, selectedFolderId, selectedTagId, noteTagMap, searchQuery, sortBy])
+  }, [shortcuts, createNote])
 
   if (!loaded) return <div className="flex h-screen" style={{ backgroundColor: 'var(--app-main)' }} />
 
@@ -490,91 +584,80 @@ export function MainPanel(): JSX.Element {
       data-theme-color={themeColor}
     >
       {/* ── 좌측 사이드바 ── */}
-      {showSidebar && <div
-        className="flex flex-col w-[200px] flex-shrink-0 border-r"
-        style={{ backgroundColor: 'var(--app-sidebar)', borderColor: 'var(--app-border)' }}
-      >
-        {/* 헤더 */}
+      {showSidebar && (
         <div
-          className="flex items-center justify-between px-3 py-2.5 border-b flex-shrink-0"
-          style={{ borderColor: 'var(--app-border)', WebkitAppRegion: 'drag' } as React.CSSProperties}
+          className="flex flex-col w-[200px] flex-shrink-0 border-r"
+          style={{ backgroundColor: 'var(--app-sidebar)', borderColor: 'var(--app-border)' }}
         >
-          <SortDropdown sortBy={sortBy} onChange={setSortBy} />
-          <div className="flex items-center gap-1.5" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-            <button
-              onClick={() => setShowSettings((v) => !v)}
-              className="transition-opacity hover:opacity-80"
-              style={{ color: showSettings ? 'var(--app-text)' : 'var(--app-text-muted)' }}
-              title="설정"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <circle cx="7" cy="7" r="2" stroke="currentColor" strokeWidth="1.2"/>
-                <path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.9 2.9l1.1 1.1M9.9 9.9l1.1 1.1M2.9 11.1l1.1-1.1M9.9 4.1l1.1-1.1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-              </svg>
-            </button>
-            <button
-              onClick={() => createNote({ folderId: selectedFolderId === 'uncategorized' ? null : (selectedFolderId ?? null) })}
-              className="transition-opacity hover:opacity-80"
-              style={{ color: 'var(--app-text-muted)' }}
-              title="새 메모"
-            >
-              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-                <path d="M11.5 1.5L13.5 3.5L5.5 11.5H3.5V9.5L11.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-                <path d="M2 13.5H13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* 폴더 + 태그 패널 */}
-        <FolderPanel notes={notes} isDark={isDark} />
-
-        {/* 검색창 */}
-        <div className="px-2 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--app-border)' }}>
-          <div className="relative flex items-center">
-            <svg className="absolute left-2 pointer-events-none" width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ color: 'var(--app-text-dim)' }}>
-              <circle cx="4.5" cy="4.5" r="3.5" stroke="currentColor" strokeWidth="1.2"/>
-              <path d="M7.5 7.5L10 10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-            </svg>
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="검색..."
-              className="w-full text-xs rounded-md pl-6 pr-2 py-1 outline-none"
-              style={{ backgroundColor: 'var(--app-hover)', color: 'var(--app-text)', caretColor: 'var(--app-text)' }}
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="absolute right-1.5 text-xs" style={{ color: 'var(--app-text-dim)' }}>
-                ×
+          {/* 헤더 */}
+          <div
+            className="flex items-center justify-between px-3 py-2.5 border-b flex-shrink-0"
+            style={{ borderColor: 'var(--app-border)', WebkitAppRegion: 'drag' } as React.CSSProperties}
+          >
+            <SortDropdown sortBy={sortBy} onChange={setSortBy} />
+            <div className="flex items-center gap-1.5" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+              <button
+                onClick={() => setShowSettings((v) => !v)}
+                className="transition-opacity hover:opacity-80"
+                style={{ color: showSettings ? 'var(--app-text)' : 'var(--app-text-muted)' }}
+                title="설정"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <circle cx="7" cy="7" r="2" stroke="currentColor" strokeWidth="1.2"/>
+                  <path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.9 2.9l1.1 1.1M9.9 9.9l1.1 1.1M2.9 11.1l1.1-1.1M9.9 4.1l1.1-1.1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
               </button>
-            )}
-          </div>
-        </div>
-
-        {/* 노트 목록 */}
-        <div className="sidebar-list flex-1 overflow-y-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-20 text-xs" style={{ color: 'var(--app-text-dim)' }}>
-              불러오는 중...
+              <button
+                onClick={() => createNote({})}
+                className="transition-opacity hover:opacity-80"
+                style={{ color: 'var(--app-text-muted)' }}
+                title="새 메모"
+              >
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                  <path d="M11.5 1.5L13.5 3.5L5.5 11.5H3.5V9.5L11.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                  <path d="M2 13.5H13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+              </button>
             </div>
-          ) : displayedNotes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-32 gap-2" style={{ color: 'var(--app-text-dim)' }}>
-              {searchQuery ? (
-                <p className="text-xs">검색 결과 없음</p>
-              ) : (
-                <>
-                  <span className="text-3xl">📝</span>
-                  <p className="text-xs">메모가 없습니다</p>
-                </>
+          </div>
+
+          {/* 검색창 */}
+          <div className="px-2 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--app-border)' }}>
+            <div className="relative flex items-center">
+              <svg className="absolute left-2 pointer-events-none" width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ color: 'var(--app-text-dim)' }}>
+                <circle cx="4.5" cy="4.5" r="3.5" stroke="currentColor" strokeWidth="1.2"/>
+                <path d="M7.5 7.5L10 10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="검색..."
+                className="w-full text-xs rounded-md pl-6 pr-2 py-1 outline-none"
+                style={{ backgroundColor: 'var(--app-hover)', color: 'var(--app-text)', caretColor: 'var(--app-text)' }}
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="absolute right-1.5 text-xs" style={{ color: 'var(--app-text-dim)' }}>
+                  ×
+                </button>
               )}
             </div>
+          </div>
+
+          {/* 트리 뷰 */}
+          {isLoading ? (
+            <div className="flex items-center justify-center h-20 text-xs flex-1" style={{ color: 'var(--app-text-dim)' }}>
+              불러오는 중...
+            </div>
           ) : (
-            displayedNotes.map((note) => <NoteCard key={note.id} note={note} isDark={isDark} />)
+            <SidebarTree searchQuery={searchQuery} sortBy={sortBy} isDark={isDark} />
           )}
+
+          {/* 태그 섹션 */}
+          <TagSection isDark={isDark} />
         </div>
-      </div>}
+      )}
 
       {/* ── 우측 에디터 패널 ── */}
       <InlineEditor isDark={isDark} />
