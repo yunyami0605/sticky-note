@@ -408,6 +408,142 @@ export function noteToMarkdown(content: string): string {
   }
 }
 
+// ── Markdown → Tiptap JSON ────────────────────────────────────
+
+type InlineNode = { type: 'text'; text: string; marks?: { type: string }[] }
+
+function parseInline(text: string): InlineNode[] {
+  const nodes: InlineNode[] = []
+  // patterns: **bold**, *italic*, ~~strike~~, `code`
+  const pattern = /(\*\*(.+?)\*\*|\*(.+?)\*|~~(.+?)~~|`(.+?)`)/g
+  let last = 0
+  let m: RegExpExecArray | null
+
+  while ((m = pattern.exec(text)) !== null) {
+    if (m.index > last) nodes.push({ type: 'text', text: text.slice(last, m.index) })
+    if (m[2] !== undefined) nodes.push({ type: 'text', text: m[2], marks: [{ type: 'bold' }] })
+    else if (m[3] !== undefined) nodes.push({ type: 'text', text: m[3], marks: [{ type: 'italic' }] })
+    else if (m[4] !== undefined) nodes.push({ type: 'text', text: m[4], marks: [{ type: 'strike' }] })
+    else if (m[5] !== undefined) nodes.push({ type: 'text', text: m[5], marks: [{ type: 'code' }] })
+    last = m.index + m[0].length
+  }
+  if (last < text.length) nodes.push({ type: 'text', text: text.slice(last) })
+  return nodes
+}
+
+function paragraph(text: string): TipNode {
+  return { type: 'paragraph', content: parseInline(text) }
+}
+
+export function markdownToTiptapJSON(md: string): string {
+  const lines = md.split('\n')
+  const blocks: TipNode[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+
+    // 빈 줄
+    if (line.trim() === '') { i++; continue }
+
+    // 구분선
+    if (/^---+$/.test(line.trim())) {
+      blocks.push({ type: 'horizontalRule' })
+      i++; continue
+    }
+
+    // 헤딩
+    const headingM = line.match(/^(#{1,3})\s+(.*)$/)
+    if (headingM) {
+      blocks.push({ type: 'heading', attrs: { level: headingM[1].length }, content: parseInline(headingM[2]) })
+      i++; continue
+    }
+
+    // 코드 블록
+    if (line.startsWith('```')) {
+      const lang = line.slice(3).trim()
+      const codeLines: string[] = []
+      i++
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        codeLines.push(lines[i])
+        i++
+      }
+      i++ // closing ```
+      blocks.push({
+        type: 'codeBlock',
+        attrs: { language: lang || null },
+        content: [{ type: 'text', text: codeLines.join('\n') }],
+      })
+      continue
+    }
+
+    // 인용문 (연속 > 줄 묶기)
+    if (line.startsWith('> ')) {
+      const quoteLines: string[] = []
+      while (i < lines.length && lines[i].startsWith('> ')) {
+        quoteLines.push(lines[i].slice(2))
+        i++
+      }
+      blocks.push({
+        type: 'blockquote',
+        content: quoteLines.map((l) => paragraph(l)),
+      })
+      continue
+    }
+
+    // 체크리스트
+    const taskM = line.match(/^-\s+\[( |x)\]\s+(.*)$/)
+    if (taskM) {
+      const items: TipNode[] = []
+      let cur = line
+      while (cur) {
+        const m = cur.match(/^-\s+\[( |x)\]\s+(.*)$/)
+        if (!m) break
+        items.push({
+          type: 'taskItem',
+          attrs: { checked: m[1] === 'x' },
+          content: [paragraph(m[2])],
+        })
+        i++
+        cur = lines[i] ?? ''
+        if (!cur.match(/^-\s+\[( |x)\]/)) break
+      }
+      blocks.push({ type: 'taskList', content: items })
+      continue
+    }
+
+    // 불릿 목록
+    if (/^[-*]\s+/.test(line)) {
+      const items: TipNode[] = []
+      while (i < lines.length && /^[-*]\s+/.test(lines[i])) {
+        const text = lines[i].replace(/^[-*]\s+/, '')
+        items.push({ type: 'listItem', content: [paragraph(text)] })
+        i++
+      }
+      blocks.push({ type: 'bulletList', content: items })
+      continue
+    }
+
+    // 번호 목록
+    if (/^\d+\.\s+/.test(line)) {
+      const items: TipNode[] = []
+      while (i < lines.length && /^\d+\.\s+/.test(lines[i])) {
+        const text = lines[i].replace(/^\d+\.\s+/, '')
+        items.push({ type: 'listItem', content: [paragraph(text)] })
+        i++
+      }
+      blocks.push({ type: 'orderedList', content: items })
+      continue
+    }
+
+    // 일반 단락
+    blocks.push(paragraph(line))
+    i++
+  }
+
+  return JSON.stringify({ type: 'doc', content: blocks.length ? blocks : [{ type: 'paragraph' }] })
+}
+
 export function getNoteTitle(content: string): string {
   if (!content) return '메모'
   try {

@@ -287,6 +287,13 @@ export function SettingsPanel({ onClose }: Props): JSX.Element {
     setTimeout(() => setExportStatus(null), 2000)
   }
 
+  const handleImportMd = async (): Promise<void> => {
+    setExportStatus('가져오는 중...')
+    const result = await window.api.note.importMd()
+    setExportStatus(result.success ? `${result.count}개 메모 가져오기 완료!` : '취소됨')
+    setTimeout(() => setExportStatus(null), 2000)
+  }
+
   return (
     <div
       className="absolute inset-0 z-50 flex items-start justify-end"
@@ -464,6 +471,18 @@ export function SettingsPanel({ onClose }: Props): JSX.Element {
                 }}
               >
                 전체 메모 내보내기 ({notes.length}개)
+              </button>
+              <div style={{ height: 1, backgroundColor: 'var(--app-border)', margin: '4px 0' }} />
+              <button
+                onClick={handleImportMd}
+                className="w-full py-2 rounded-lg text-xs font-medium transition-colors"
+                style={{
+                  backgroundColor: 'var(--app-hover)',
+                  color: 'var(--app-text)',
+                  border: '1px solid var(--app-border)',
+                }}
+              >
+                파일에서 가져오기 (.md)
               </button>
               {exportStatus && (
                 <p className="text-[11px] text-center" style={{ color: 'var(--app-text-muted)' }}>

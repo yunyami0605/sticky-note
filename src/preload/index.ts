@@ -20,6 +20,8 @@ const api = {
       ipcRenderer.invoke(IPC.NOTE_EXPORT_ALL),
     exportMd: (noteId: string): Promise<{ success: boolean; filePath?: string; error?: string }> =>
       ipcRenderer.invoke(IPC.NOTE_EXPORT_MD, noteId),
+    importMd: (): Promise<{ success: boolean; count?: number }> =>
+      ipcRenderer.invoke(IPC.NOTE_IMPORT_MD),
     duplicate: (noteId: string): Promise<Note | null> => ipcRenderer.invoke(IPC.NOTE_DUPLICATE, noteId),
     getOpenWindows: (): Promise<string[]> => ipcRenderer.invoke(IPC.NOTE_GET_OPEN_WINDOWS),
     toggleWindow: (noteId: string): Promise<boolean> => ipcRenderer.invoke(IPC.NOTE_TOGGLE_WINDOW, noteId),

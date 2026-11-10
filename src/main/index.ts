@@ -7,7 +7,7 @@ import {
   getSettings, updateSettings, noteToPlainText, noteToMarkdown, getNoteTitle,
   getAllFolders, createFolder, updateFolder, deleteFolder,
   getAllTags, createTag, updateTag, deleteTag,
-  getNoteTagIds, setNoteTag, removeNoteTag,
+  getNoteTagIds, setNoteTag, removeNoteTag, markdownToTiptapJSON,
 } from './services/database'
 import { IPC } from '../shared/types'
 import type { CreateNotePayload, UpdateNotePayload, AppSettings, CreateFolderPayload, UpdateFolderPayload, CreateTagPayload, UpdateTagPayload } from '../shared/types'
@@ -266,6 +266,28 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.SETTINGS_UPDATE, (_e, partial: Partial<AppSettings>) => {
     return updateSettings(partial)
+  })
+
+  // ── Markdown 가져오기 ─────────────────────────────────────
+  ipcMain.handle(IPC.NOTE_IMPORT_MD, async () => {
+    const { filePaths } = await dialog.showOpenDialog({
+      title: '마크다운 파일 가져오기',
+      filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
+      properties: ['openFile', 'multiSelections'],
+    })
+    if (!filePaths?.length) return { success: false }
+
+    const created: string[] = []
+    for (const filePath of filePaths) {
+      const md = fs.readFileSync(filePath, 'utf-8')
+      const content = markdownToTiptapJSON(md)
+      const note = createNote({})
+      updateNote(note.id, { content })
+      createNoteWindow(note.id)
+      mainWindow?.webContents.send('note:created', { ...note, content })
+      created.push(note.id)
+    }
+    return { success: true, count: created.length }
   })
 
   // ── Markdown 내보내기 ─────────────────────────────────────
