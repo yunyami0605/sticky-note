@@ -268,7 +268,7 @@ function sortNotes(notes: Note[], sortBy: SortBy): Note[] {
 }
 
 interface TreeSectionProps {
-  sectionId: string        // 'uncategorized' | folderId
+  sectionId: string
   icon: string
   label: string
   notes: Note[]
@@ -279,22 +279,73 @@ interface TreeSectionProps {
   onRename?: () => void
   onDelete?: () => void
   renamingContent?: JSX.Element
+  onDropNote?: (noteId: string) => void
+  onDropFolder?: (folderId: string) => void
+  draggableFolder?: boolean
+  onFolderDragStart?: (e: React.DragEvent) => void
+  folderDragOver?: boolean
 }
 
 function TreeSection({
-  icon, label, notes, expanded, isDark, onToggle, onNewNote, onDelete, onRename, renamingContent,
+  sectionId, icon, label, notes, expanded, isDark,
+  onToggle, onNewNote, onDelete, onRename, renamingContent,
+  onDropNote, onDropFolder, draggableFolder, onFolderDragStart, folderDragOver,
 }: TreeSectionProps): JSX.Element {
-  const { selectedId, setSelectedId, openWindowIds } = useNoteStore()
+  const [noteDropOver, setNoteDropOver] = useState(false)
+
+  const handleDragOver = (e: React.DragEvent): void => {
+    if (e.dataTransfer.types.includes('dragtype')) {
+      e.preventDefault()
+      e.stopPropagation()
+      setNoteDropOver(true)
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent): void => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setNoteDropOver(false)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    setNoteDropOver(false)
+    const type = e.dataTransfer.getData('dragtype')
+    if (type === 'note') {
+      const noteId = e.dataTransfer.getData('noteid')
+      if (noteId) onDropNote?.(noteId)
+    } else if (type === 'folder') {
+      const folderId = e.dataTransfer.getData('folderid')
+      if (folderId && folderId !== sectionId) onDropFolder?.(folderId)
+    }
+  }
+
+  const isDropTarget = noteDropOver || folderDragOver
 
   return (
-    <div>
+    <div
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       {/* 섹션 헤더 */}
-      <div className="group flex items-center w-full border-b" style={{ borderColor: 'var(--app-border)' }}>
+      <div
+        className="group flex items-center w-full border-b transition-colors"
+        style={{
+          borderColor: 'var(--app-border)',
+          backgroundColor: isDropTarget ? (isDark ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.08)') : 'transparent',
+          outline: isDropTarget ? `1px dashed ${isDark ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.4)'}` : 'none',
+          outlineOffset: -1,
+        }}
+      >
         {renamingContent ?? (
           <button
             className="flex items-center gap-1.5 flex-1 px-2 py-1.5 text-xs text-left min-w-0"
             onClick={onToggle}
             style={{ color: 'var(--app-text-muted)' }}
+            draggable={draggableFolder}
+            onDragStart={draggableFolder ? onFolderDragStart : undefined}
           >
             <span
               className="text-[7px] flex-shrink-0 transition-transform duration-150"
@@ -338,18 +389,12 @@ function TreeSection({
       {expanded && (
         <div>
           {notes.length === 0 ? (
-            <div
-              className="pl-6 py-2 text-[10px]"
-              style={{ color: 'var(--app-text-dim)' }}
-            >메모 없음</div>
+            <div className="pl-6 py-2 text-[10px]" style={{ color: 'var(--app-text-dim)' }}>
+              메모 없음
+            </div>
           ) : (
             notes.map((note) => (
-              <NoteCard
-                key={note.id}
-                note={note}
-                isDark={isDark}
-                indent
-              />
+              <NoteCard key={note.id} note={note} isDark={isDark} indent />
             ))
           )}
         </div>
@@ -368,8 +413,8 @@ function SidebarTree({
   sortBy: SortBy
   isDark: boolean
 }): JSX.Element {
-  const { notes, createNote } = useNoteStore()
-  const { folders, load, createFolder, renameFolder, deleteFolder } = useFolderStore()
+  const { notes, createNote, updateNote } = useNoteStore()
+  const { folders, load, createFolder, renameFolder, deleteFolder, reorderFolders } = useFolderStore()
   const { selectedTagId, noteTagMap, loadNoteTagIds } = useTagStore()
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(['uncategorized']))
@@ -377,6 +422,8 @@ function SidebarTree({
   const [newFolderName, setNewFolderName] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const [draggingFolderId, setDraggingFolderId] = useState<string | null>(null)
+  const [folderDragOverId, setFolderDragOverId] = useState<string | null>(null)
 
   useEffect(() => { load() }, [load])
 
@@ -431,6 +478,20 @@ function SidebarTree({
     }
   }, [searchQuery, folders])
 
+  const handleFolderDragStart = useCallback((folderId: string) => (e: React.DragEvent): void => {
+    e.dataTransfer.setData('dragtype', 'folder')
+    e.dataTransfer.setData('folderid', folderId)
+    e.dataTransfer.effectAllowed = 'move'
+    setDraggingFolderId(folderId)
+  }, [])
+
+  // Global dragend to clear folder drag state
+  useEffect(() => {
+    const handler = (): void => { setDraggingFolderId(null); setFolderDragOverId(null) }
+    document.addEventListener('dragend', handler)
+    return () => document.removeEventListener('dragend', handler)
+  }, [])
+
   const handleAddFolder = async (): Promise<void> => {
     const name = newFolderName.trim()
     if (!name) return
@@ -458,6 +519,8 @@ function SidebarTree({
         isDark={isDark}
         onToggle={() => toggle('uncategorized')}
         onNewNote={() => { createNote({ folderId: null }); setExpandedIds((p) => new Set([...p, 'uncategorized'])) }}
+        onDropNote={(noteId) => { updateNote(noteId, { folderId: null }) }}
+        folderDragOver={folderDragOverId === 'uncategorized'}
       />
 
       {/* 사용자 폴더 */}
@@ -476,6 +539,11 @@ function SidebarTree({
             onNewNote={() => { createNote({ folderId: folder.id }); setExpandedIds((p) => new Set([...p, folder.id])) }}
             onRename={() => { setRenamingId(folder.id); setRenameValue(folder.name) }}
             onDelete={() => deleteFolder(folder.id)}
+            onDropNote={(noteId) => { updateNote(noteId, { folderId: folder.id }) }}
+            onDropFolder={(folderId) => { void reorderFolders(folderId, folder.id) }}
+            draggableFolder
+            onFolderDragStart={handleFolderDragStart(folder.id)}
+            folderDragOver={folderDragOverId === folder.id && draggingFolderId !== folder.id}
             renamingContent={isRenaming ? (
               <input
                 autoFocus

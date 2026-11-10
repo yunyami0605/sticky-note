@@ -128,26 +128,34 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
         <div
-          className="flex items-center gap-1"
+          className="flex items-center gap-1.5 group"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <button
             onClick={handleClose}
-            className="w-3 h-3 rounded-full bg-red-400 hover:bg-red-500 transition-colors"
+            className="w-4 h-4 rounded-full bg-red-400 hover:bg-red-500 transition-colors flex items-center justify-center"
             title="닫기"
-          />
+          >
+            <span className="hidden group-hover:block text-[9px] font-bold text-red-800 leading-none">×</span>
+          </button>
           <button
             onClick={handleMinimize}
-            className="w-3 h-3 rounded-full bg-yellow-400 hover:bg-yellow-500 transition-colors"
+            className="w-4 h-4 rounded-full bg-yellow-400 hover:bg-yellow-500 transition-colors flex items-center justify-center"
             title="최소화"
-          />
+          >
+            <span className="hidden group-hover:block text-[9px] font-bold text-yellow-800 leading-none">−</span>
+          </button>
           <button
             onClick={handlePinToggle}
-            className={`w-3 h-3 rounded-full transition-colors ${
-              note.isPinned ? 'bg-green-500' : 'bg-green-200 hover:bg-green-300'
+            className={`w-4 h-4 rounded-full transition-colors flex items-center justify-center ${
+              note.isPinned ? 'bg-green-500 hover:bg-green-600' : 'bg-green-300 hover:bg-green-400'
             }`}
             title={note.isPinned ? '고정 해제' : '항상 위에 고정'}
-          />
+          >
+            <span className="hidden group-hover:block text-[9px] font-bold text-green-800 leading-none">
+              {note.isPinned ? '↓' : '↑'}
+            </span>
+          </button>
         </div>
 
         <div

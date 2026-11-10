@@ -176,6 +176,13 @@ export function NoteCard({ note, isDark = true, indent = false }: Props): JSX.El
       <div
         onClick={() => setSelectedId(note.id)}
         onContextMenu={handleContextMenu}
+        draggable={indent}
+        onDragStart={indent ? (e) => {
+          e.dataTransfer.setData('dragtype', 'note')
+          e.dataTransfer.setData('noteid', note.id)
+          e.dataTransfer.effectAllowed = 'move'
+          e.stopPropagation()
+        } : undefined}
         className="group relative flex items-center gap-0 cursor-pointer border-b transition-colors"
         style={{
           borderColor: 'var(--app-border)',
