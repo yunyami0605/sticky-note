@@ -51,6 +51,7 @@ export function initDatabase(): void {
   const noteColumns = (db.pragma('table_info(notes)') as { name: string }[]).map((c) => c.name)
   if (!noteColumns.includes('folder_id')) db.exec(`ALTER TABLE notes ADD COLUMN folder_id TEXT`)
   if (!noteColumns.includes('icon')) db.exec(`ALTER TABLE notes ADD COLUMN icon TEXT`)
+  if (!noteColumns.includes('sort_order')) db.exec(`ALTER TABLE notes ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`)
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS settings (
@@ -64,9 +65,12 @@ export function initDatabase(): void {
       id         TEXT PRIMARY KEY,
       name       TEXT NOT NULL,
       sort_order INTEGER NOT NULL DEFAULT 0,
+      parent_id  TEXT,
       created_at TEXT NOT NULL
     )
   `)
+  const folderColumns = (db.pragma('table_info(folders)') as { name: string }[]).map((c) => c.name)
+  if (!folderColumns.includes('parent_id')) db.exec(`ALTER TABLE folders ADD COLUMN parent_id TEXT`)
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS tags (
@@ -100,6 +104,7 @@ function rowToNote(row: Record<string, unknown>): Note {
     fontSize: row.font_size as Note['fontSize'],
     folderId: (row.folder_id as string | null) ?? null,
     icon: (row.icon as string | null) ?? null,
+    sortOrder: (row.sort_order as number) ?? 0,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   }
@@ -112,6 +117,7 @@ export function getAllNotes(): Note[] {
 
 export function createNote(payload: CreateNotePayload): Note {
   const now = new Date().toISOString()
+  const maxRow = db.prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM notes').get() as { m: number }
   const note: Note = {
     id: uuidv4(),
     content: '',
@@ -123,13 +129,14 @@ export function createNote(payload: CreateNotePayload): Note {
     fontSize: 'md',
     folderId: payload.folderId ?? null,
     icon: null,
+    sortOrder: maxRow.m + 1,
     createdAt: now,
     updatedAt: now,
   }
 
   db.prepare(`
-    INSERT INTO notes (id, content, color, opacity, pos_x, pos_y, width, height, is_pinned, font_size, folder_id, icon, created_at, updated_at)
-    VALUES (@id, @content, @color, @opacity, @posX, @posY, @width, @height, @isPinned, @fontSize, @folderId, @icon, @createdAt, @updatedAt)
+    INSERT INTO notes (id, content, color, opacity, pos_x, pos_y, width, height, is_pinned, font_size, folder_id, icon, sort_order, created_at, updated_at)
+    VALUES (@id, @content, @color, @opacity, @posX, @posY, @width, @height, @isPinned, @fontSize, @folderId, @icon, @sortOrder, @createdAt, @updatedAt)
   `).run({
     id: note.id,
     content: note.content,
@@ -143,6 +150,7 @@ export function createNote(payload: CreateNotePayload): Note {
     fontSize: note.fontSize,
     folderId: note.folderId,
     icon: note.icon,
+    sortOrder: note.sortOrder,
     createdAt: note.createdAt,
     updatedAt: note.updatedAt,
   })
@@ -170,6 +178,7 @@ export function updateNote(id: string, payload: UpdateNotePayload): Note | null 
       font_size  = @fontSize,
       folder_id  = @folderId,
       icon       = @icon,
+      sort_order = @sortOrder,
       updated_at = @updatedAt
     WHERE id = @id
   `).run({
@@ -185,6 +194,7 @@ export function updateNote(id: string, payload: UpdateNotePayload): Note | null 
     fontSize: payload.fontSize ?? (existing.font_size as string),
     folderId: 'folderId' in payload ? payload.folderId : (existing.folder_id as string | null),
     icon: 'icon' in payload ? payload.icon : (existing.icon as string | null),
+    sortOrder: payload.sortOrder ?? (existing.sort_order as number) ?? 0,
     updatedAt,
   })
 
@@ -194,6 +204,13 @@ export function updateNote(id: string, payload: UpdateNotePayload): Note | null 
 export function deleteNote(id: string): boolean {
   const result = db.prepare('DELETE FROM notes WHERE id = ?').run(id)
   return result.changes > 0
+}
+
+export function reorderNotes(updates: { id: string; sortOrder: number }[]): void {
+  const stmt = db.prepare('UPDATE notes SET sort_order = ? WHERE id = ?')
+  for (const { id, sortOrder } of updates) {
+    stmt.run(sortOrder, id)
+  }
 }
 
 // ── Note Tags ─────────────────────────────────────────────────
@@ -218,6 +235,7 @@ function rowToFolder(row: Record<string, unknown>): Folder {
     id: row.id as string,
     name: row.name as string,
     sortOrder: row.sort_order as number,
+    parentId: (row.parent_id as string | null) ?? null,
     createdAt: row.created_at as string,
   }
 }
@@ -229,27 +247,59 @@ export function getAllFolders(): Folder[] {
 
 export function createFolder(payload: CreateFolderPayload): Folder {
   const now = new Date().toISOString()
-  const folder: Folder = { id: uuidv4(), name: payload.name, sortOrder: 0, createdAt: now }
-  db.prepare('INSERT INTO folders (id, name, sort_order, created_at) VALUES (@id, @name, @sortOrder, @createdAt)')
-    .run({ id: folder.id, name: folder.name, sortOrder: folder.sortOrder, createdAt: folder.createdAt })
+  const folder: Folder = { id: uuidv4(), name: payload.name, sortOrder: 0, parentId: null, createdAt: now }
+  db.prepare('INSERT INTO folders (id, name, sort_order, parent_id, created_at) VALUES (@id, @name, @sortOrder, @parentId, @createdAt)')
+    .run({ id: folder.id, name: folder.name, sortOrder: folder.sortOrder, parentId: folder.parentId, createdAt: folder.createdAt })
   return folder
 }
 
 export function updateFolder(id: string, payload: UpdateFolderPayload): Folder | null {
   const existing = db.prepare('SELECT * FROM folders WHERE id = ?').get(id) as Record<string, unknown> | undefined
   if (!existing) return null
-  db.prepare('UPDATE folders SET name = @name, sort_order = @sortOrder WHERE id = @id').run({
+  const newParentId = 'parentId' in payload ? payload.parentId : (existing.parent_id as string | null)
+  db.prepare('UPDATE folders SET name = @name, sort_order = @sortOrder, parent_id = @parentId WHERE id = @id').run({
     id,
     name: payload.name ?? (existing.name as string),
     sortOrder: payload.sortOrder ?? (existing.sort_order as number),
+    parentId: newParentId,
   })
-  return rowToFolder({ ...existing, name: payload.name ?? existing.name, sort_order: payload.sortOrder ?? existing.sort_order })
+  return rowToFolder({ ...existing, name: payload.name ?? existing.name, sort_order: payload.sortOrder ?? existing.sort_order, parent_id: newParentId })
 }
 
 export function deleteFolder(id: string): boolean {
   db.prepare('UPDATE notes SET folder_id = NULL WHERE folder_id = ?').run(id)
   const result = db.prepare('DELETE FROM folders WHERE id = ?').run(id)
   return result.changes > 0
+}
+
+export function duplicateFolder(id: string): { folder: Folder; notes: Note[] } | null {
+  const src = db.prepare('SELECT * FROM folders WHERE id = ?').get(id) as Record<string, unknown> | undefined
+  if (!src) return null
+  const now = new Date().toISOString()
+  const newFolder: Folder = {
+    id: uuidv4(),
+    name: (src.name as string) + ' 복사',
+    sortOrder: (src.sort_order as number) + 1,
+    parentId: (src.parent_id as string | null) ?? null,
+    createdAt: now,
+  }
+  db.prepare('INSERT INTO folders (id, name, sort_order, parent_id, created_at) VALUES (@id, @name, @sortOrder, @parentId, @createdAt)')
+    .run({ id: newFolder.id, name: newFolder.name, sortOrder: newFolder.sortOrder, parentId: newFolder.parentId, createdAt: newFolder.createdAt })
+  const srcNotes = db.prepare('SELECT * FROM notes WHERE folder_id = ?').all(id) as Record<string, unknown>[]
+  const newNotes: Note[] = []
+  for (const srcNote of srcNotes) {
+    const note = createNote({ color: srcNote.color as NoteColor, folderId: newFolder.id })
+    const updated = updateNote(note.id, {
+      content: srcNote.content as string,
+      fontSize: srcNote.font_size as Note['fontSize'],
+      opacity: srcNote.opacity as number,
+      size: { width: srcNote.width as number, height: srcNote.height as number },
+      icon: srcNote.icon as string | null,
+    })
+    if (updated) newNotes.push(updated)
+    else newNotes.push(note)
+  }
+  return { folder: newFolder, notes: newNotes }
 }
 
 // ── Tags ──────────────────────────────────────────────────────

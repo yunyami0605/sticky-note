@@ -12,6 +12,7 @@ interface NoteStore {
   updateNote: (id: string, payload: UpdateNotePayload) => Promise<void>
   deleteNote: (id: string) => Promise<void>
   duplicateNote: (noteId: string) => Promise<Note | null>
+  reorderNotes: (updates: { id: string; sortOrder: number }[]) => Promise<void>
   openNoteWindow: (noteId: string) => Promise<void>
   toggleNoteWindow: (noteId: string) => Promise<void>
   setWindowOpen: (id: string, open: boolean) => void
@@ -77,6 +78,16 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   duplicateNote: async (noteId) => {
     const note = await window.api.note.duplicate(noteId)
     return note
+  },
+
+  reorderNotes: async (updates) => {
+    set((s) => ({
+      notes: s.notes.map((n) => {
+        const u = updates.find((u) => u.id === n.id)
+        return u ? { ...n, sortOrder: u.sortOrder } : n
+      }),
+    }))
+    await window.api.note.reorder(updates)
   },
 
   openNoteWindow: async (noteId) => {

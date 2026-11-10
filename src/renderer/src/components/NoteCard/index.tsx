@@ -17,6 +17,9 @@ interface Props {
   note: Note
   isDark?: boolean
   indent?: boolean
+  selectionMode?: boolean
+  selected?: boolean
+  onToggleSelect?: () => void
 }
 
 function getTitle(content: string): string {
@@ -155,10 +158,10 @@ function ContextMenu({ x, y, noteId, currentFolderId, isWindowOpen, isDark, onCl
   )
 }
 
-export function NoteCard({ note, isDark = true, indent = false }: Props): JSX.Element {
+export function NoteCard({ note, isDark = true, indent = false, selectionMode = false, selected = false, onToggleSelect }: Props): JSX.Element {
   const { selectedId, setSelectedId, openWindowIds } = useNoteStore()
   const { tags, noteTagMap } = useTagStore()
-  const isSelected = selectedId === note.id
+  const isSelected = !selectionMode && selectedId === note.id
   const isWindowOpen = openWindowIds.has(note.id)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
   const noteTags = (noteTagMap[note.id] ?? [])
@@ -166,18 +169,27 @@ export function NoteCard({ note, isDark = true, indent = false }: Props): JSX.El
     .filter(Boolean) as typeof tags
 
   const handleContextMenu = (e: React.MouseEvent): void => {
+    if (selectionMode) return
     e.preventDefault()
     e.stopPropagation()
     setCtxMenu({ x: e.clientX, y: e.clientY })
   }
 
+  const handleClick = (): void => {
+    if (selectionMode) {
+      onToggleSelect?.()
+    } else {
+      setSelectedId(note.id)
+    }
+  }
+
   return (
     <>
       <div
-        onClick={() => setSelectedId(note.id)}
+        onClick={handleClick}
         onContextMenu={handleContextMenu}
-        draggable={indent}
-        onDragStart={indent ? (e) => {
+        draggable={indent && !selectionMode}
+        onDragStart={indent && !selectionMode ? (e) => {
           e.dataTransfer.setData('dragtype', 'note')
           e.dataTransfer.setData('noteid', note.id)
           e.dataTransfer.effectAllowed = 'move'
@@ -186,14 +198,27 @@ export function NoteCard({ note, isDark = true, indent = false }: Props): JSX.El
         className="group relative flex items-center gap-0 cursor-pointer border-b transition-colors"
         style={{
           borderColor: 'var(--app-border)',
-          backgroundColor: isSelected ? 'var(--app-select)' : 'transparent',
+          backgroundColor: isSelected || (selectionMode && selected) ? 'var(--app-select)' : 'transparent',
           paddingLeft: indent ? 12 : 0,
         }}
-        onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--app-hover)' }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = isSelected ? 'var(--app-select)' : 'transparent' }}
+        onMouseEnter={(e) => { if (!isSelected && !(selectionMode && selected)) (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--app-hover)' }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = (isSelected || (selectionMode && selected)) ? 'var(--app-select)' : 'transparent' }}
       >
-        {/* color accent bar */}
-        <div className={`w-[3px] self-stretch flex-shrink-0 ${COLOR_ACCENT[note.color]}`} />
+        {/* color accent bar or selection checkbox */}
+        {selectionMode ? (
+          <div className="w-[18px] flex-shrink-0 flex items-center justify-center self-stretch">
+            <span
+              className="w-3 h-3 rounded border flex items-center justify-center text-[8px] font-bold"
+              style={{
+                borderColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
+                backgroundColor: selected ? (isDark ? 'rgba(99,102,241,0.8)' : 'rgba(99,102,241,0.7)') : 'transparent',
+                color: '#fff',
+              }}
+            >{selected ? '✓' : ''}</span>
+          </div>
+        ) : (
+          <div className={`w-[3px] self-stretch flex-shrink-0 ${COLOR_ACCENT[note.color]}`} />
+        )}
 
         {/* content */}
         <div className="flex flex-col px-2.5 py-2 flex-1 min-w-0">

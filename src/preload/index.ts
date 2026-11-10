@@ -23,6 +23,7 @@ const api = {
     importMd: (): Promise<{ success: boolean; count?: number }> =>
       ipcRenderer.invoke(IPC.NOTE_IMPORT_MD),
     duplicate: (noteId: string): Promise<Note | null> => ipcRenderer.invoke(IPC.NOTE_DUPLICATE, noteId),
+    reorder: (updates: { id: string; sortOrder: number }[]): Promise<void> => ipcRenderer.invoke(IPC.NOTE_REORDER, updates),
     getOpenWindows: (): Promise<string[]> => ipcRenderer.invoke(IPC.NOTE_GET_OPEN_WINDOWS),
     toggleWindow: (noteId: string): Promise<boolean> => ipcRenderer.invoke(IPC.NOTE_TOGGLE_WINDOW, noteId),
     onCreated: (cb: (note: Note) => void) => {
@@ -58,6 +59,7 @@ const api = {
     create: (payload: CreateFolderPayload): Promise<Folder> => ipcRenderer.invoke(IPC.FOLDER_CREATE, payload),
     update: (id: string, payload: UpdateFolderPayload): Promise<Folder | null> => ipcRenderer.invoke(IPC.FOLDER_UPDATE, id, payload),
     delete: (id: string): Promise<boolean> => ipcRenderer.invoke(IPC.FOLDER_DELETE, id),
+    duplicate: (id: string): Promise<Folder | null> => ipcRenderer.invoke(IPC.FOLDER_DUPLICATE, id),
   },
   tag: {
     getAll: (): Promise<Tag[]> => ipcRenderer.invoke(IPC.TAG_GET_ALL),

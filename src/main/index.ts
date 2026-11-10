@@ -3,9 +3,9 @@ import path from 'path'
 import fs from 'fs'
 import { is } from '@electron-toolkit/utils'
 import {
-  initDatabase, getAllNotes, createNote, updateNote, deleteNote,
+  initDatabase, getAllNotes, createNote, updateNote, deleteNote, reorderNotes,
   getSettings, updateSettings, noteToPlainText, noteToMarkdown, getNoteTitle,
-  getAllFolders, createFolder, updateFolder, deleteFolder,
+  getAllFolders, createFolder, updateFolder, deleteFolder, duplicateFolder,
   getAllTags, createTag, updateTag, deleteTag,
   getNoteTagIds, setNoteTag, removeNoteTag, markdownToTiptapJSON,
 } from './services/database'
@@ -269,6 +269,10 @@ function registerIpcHandlers(): void {
   })
 
   // ── Markdown 가져오기 ─────────────────────────────────────
+  ipcMain.handle(IPC.NOTE_REORDER, (_e, updates: { id: string; sortOrder: number }[]) => {
+    reorderNotes(updates)
+  })
+
   ipcMain.handle(IPC.NOTE_IMPORT_MD, async () => {
     const { filePaths } = await dialog.showOpenDialog({
       title: '마크다운 파일 가져오기',
@@ -319,6 +323,16 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.FOLDER_UPDATE, (_e, id: string, payload: UpdateFolderPayload) => updateFolder(id, payload))
 
   ipcMain.handle(IPC.FOLDER_DELETE, (_e, id: string) => deleteFolder(id))
+
+  ipcMain.handle(IPC.FOLDER_DUPLICATE, (_e, id: string) => {
+    const result = duplicateFolder(id)
+    if (result) {
+      for (const note of result.notes) {
+        mainWindow?.webContents.send('note:created', note)
+      }
+    }
+    return result ? result.folder : null
+  })
 
   // ── 태그 ─────────────────────────────────────────────────
   ipcMain.handle(IPC.TAG_GET_ALL, () => getAllTags())

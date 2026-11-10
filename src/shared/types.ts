@@ -3,7 +3,7 @@ export type FontSize = 'sm' | 'md' | 'lg'
 export type ThemeMode = 'dark' | 'light'
 export type ThemeColor = 'navy' | 'midnight' | 'ocean' | 'forest' | 'rose' | 'slate'
 export type StartBehavior = 'tray' | 'main'
-export type SortBy = 'updatedAt' | 'createdAt' | 'color'
+export type SortBy = 'updatedAt' | 'createdAt' | 'color' | 'manual'
 
 export interface NotePosition {
   x: number
@@ -26,6 +26,7 @@ export interface Note {
   fontSize: FontSize
   folderId: string | null
   icon: string | null
+  sortOrder: number
   createdAt: string
   updatedAt: string
 }
@@ -34,6 +35,7 @@ export interface Folder {
   id: string
   name: string
   sortOrder: number
+  parentId: string | null
   createdAt: string
 }
 
@@ -83,6 +85,7 @@ export interface UpdateNotePayload {
   fontSize?: FontSize
   folderId?: string | null
   icon?: string | null
+  sortOrder?: number
 }
 
 export interface CreateFolderPayload {
@@ -92,6 +95,7 @@ export interface CreateFolderPayload {
 export interface UpdateFolderPayload {
   name?: string
   sortOrder?: number
+  parentId?: string | null
 }
 
 export interface CreateTagPayload {
@@ -119,6 +123,7 @@ export const IPC = {
   NOTE_EXPORT_ALL:       'note:exportAll',
   NOTE_EXPORT_MD:        'note:exportMd',
   NOTE_IMPORT_MD:        'note:importMd',
+  NOTE_REORDER:          'note:reorder',
   NOTE_GET_TAGS:         'note:getTags',
   NOTE_SET_TAG:          'note:setTag',
   NOTE_REMOVE_TAG:       'note:removeTag',
@@ -126,6 +131,7 @@ export const IPC = {
   FOLDER_CREATE:         'folder:create',
   FOLDER_UPDATE:         'folder:update',
   FOLDER_DELETE:         'folder:delete',
+  FOLDER_DUPLICATE:      'folder:duplicate',
   TAG_GET_ALL:           'tag:getAll',
   TAG_CREATE:            'tag:create',
   TAG_UPDATE:            'tag:update',

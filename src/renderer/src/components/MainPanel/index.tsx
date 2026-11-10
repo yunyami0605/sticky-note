@@ -96,6 +96,7 @@ const SORT_OPTIONS: { value: SortBy; label: string }[] = [
   { value: 'updatedAt', label: '최근 수정순' },
   { value: 'createdAt', label: '최근 생성순' },
   { value: 'color',     label: '색상별' },
+  { value: 'manual',   label: '직접 정렬' },
 ]
 
 function SortDropdown({ sortBy, onChange }: { sortBy: SortBy; onChange: (s: SortBy) => void }): JSX.Element {
@@ -263,8 +264,146 @@ function sortNotes(notes: Note[], sortBy: SortBy): Note[] {
   else if (sortBy === 'color') {
     const ORDER = ['yellow', 'blue', 'green', 'pink', 'purple', 'white']
     sorted.sort((a, b) => ORDER.indexOf(a.color) - ORDER.indexOf(b.color))
+  } else if (sortBy === 'manual') {
+    sorted.sort((a, b) => a.sortOrder !== b.sortOrder ? a.sortOrder - b.sortOrder : b.createdAt.localeCompare(a.createdAt))
   }
   return sorted
+}
+
+function NoteReorderWrapper({
+  note, isDark, selectionMode, selected, onToggleSelect, onDropOnNote,
+}: {
+  note: Note
+  isDark: boolean
+  selectionMode: boolean
+  selected: boolean
+  onToggleSelect: () => void
+  onDropOnNote?: (draggedId: string, targetId: string, before: boolean) => void
+}): JSX.Element {
+  const [indicator, setIndicator] = useState<'before' | 'after' | null>(null)
+  return (
+    <div
+      style={{ position: 'relative' }}
+      onDragOver={(e) => {
+        // Only intercept NOTE drags — let folder drags pass through to TreeSection
+        if (!e.dataTransfer.types.includes('noteid')) return
+        e.preventDefault()
+        e.stopPropagation()
+        const rect = e.currentTarget.getBoundingClientRect()
+        setIndicator(e.clientY < rect.top + rect.height / 2 ? 'before' : 'after')
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setIndicator(null)
+      }}
+      onDrop={(e) => {
+        if (e.dataTransfer.getData('dragtype') !== 'note') return  // let folder drops bubble up
+        e.preventDefault()
+        e.stopPropagation()
+        const draggedId = e.dataTransfer.getData('noteid')
+        if (draggedId && draggedId !== note.id) onDropOnNote?.(draggedId, note.id, indicator === 'before')
+        setIndicator(null)
+      }}
+    >
+      {indicator === 'before' && (
+        <div className="absolute top-0 left-0 right-0 h-0.5 z-10 pointer-events-none" style={{ backgroundColor: 'rgba(99,102,241,0.8)' }} />
+      )}
+      <NoteCard
+        note={note}
+        isDark={isDark}
+        indent
+        selectionMode={selectionMode}
+        selected={selected}
+        onToggleSelect={onToggleSelect}
+      />
+      {indicator === 'after' && (
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 z-10 pointer-events-none" style={{ backgroundColor: 'rgba(99,102,241,0.8)' }} />
+      )}
+    </div>
+  )
+}
+
+interface SelectionState {
+  sectionId: string
+  selected: Set<string>
+}
+
+interface FolderCtxMenuProps {
+  x: number
+  y: number
+  folderId: string | null
+  folderIdx: number
+  folderCount: number
+  isDark: boolean
+  onClose: () => void
+  onRename: () => void
+  onDelete: () => void
+  onNewNote: () => void
+  onNewFolder: () => void
+  onDuplicate: () => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+  onSelectDelete: () => void
+}
+
+function FolderContextMenu({
+  x, y, folderId, folderIdx, folderCount, isDark, onClose,
+  onRename, onDelete, onNewNote, onNewFolder, onDuplicate, onMoveUp, onMoveDown, onSelectDelete,
+}: FolderCtxMenuProps): JSX.Element {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent): void => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onClose])
+
+  const menuBg = isDark ? '#2a2a3e' : '#ffffff'
+  const menuBorder = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'
+  const menuText = isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.8)'
+  const menuHover = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'
+  const destructive = '#f87171'
+  const dimmed = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.25)'
+
+  const item = (label: string, onClick: () => void, color?: string, disabled?: boolean): JSX.Element => (
+    <button
+      onMouseDown={(e) => { if (disabled) return; e.stopPropagation(); onClick() }}
+      className="flex items-center gap-2 w-full px-3 py-1.5 text-left text-xs transition-colors rounded"
+      style={{ color: disabled ? dimmed : (color ?? menuText), cursor: disabled ? 'not-allowed' : 'pointer' }}
+      onMouseEnter={(e) => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.backgroundColor = menuHover }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
+    >
+      {label}
+    </button>
+  )
+
+  const sep = (): JSX.Element => (
+    <div style={{ height: 1, margin: '2px 8px', backgroundColor: menuBorder }} />
+  )
+
+  const isUncategorized = folderId === null
+
+  return (
+    <div
+      ref={ref}
+      className="fixed z-[9999] py-1 rounded-lg shadow-xl"
+      style={{ left: x, top: y, minWidth: 170, backgroundColor: menuBg, border: `1px solid ${menuBorder}` }}
+    >
+      {item('새 메모 추가', () => { onNewNote(); onClose() })}
+      {sep()}
+      {item('새 폴더 만들기', () => { onNewFolder(); onClose() })}
+      {!isUncategorized && item('폴더 복제', () => { onDuplicate(); onClose() })}
+      {sep()}
+      {!isUncategorized && item('이름 변경', () => { onRename(); onClose() })}
+      {!isUncategorized && item('위로 이동', () => { onMoveUp(); onClose() }, undefined, folderIdx <= 0)}
+      {!isUncategorized && item('아래로 이동', () => { onMoveDown(); onClose() }, undefined, folderIdx >= folderCount - 1)}
+      {sep()}
+      {item('메모 선택 삭제...', () => { onSelectDelete(); onClose() })}
+      {!isUncategorized && sep()}
+      {!isUncategorized && item('폴더 삭제', () => { onDelete(); onClose() }, destructive)}
+    </div>
+  )
 }
 
 interface TreeSectionProps {
@@ -274,6 +413,7 @@ interface TreeSectionProps {
   notes: Note[]
   expanded: boolean
   isDark: boolean
+  depth?: number
   onToggle: () => void
   onNewNote: () => void
   onRename?: () => void
@@ -281,69 +421,114 @@ interface TreeSectionProps {
   renamingContent?: JSX.Element
   onDropNote?: (noteId: string) => void
   onDropFolder?: (folderId: string) => void
+  onNestFolder?: (folderId: string) => void
   draggableFolder?: boolean
   onFolderDragStart?: (e: React.DragEvent) => void
-  folderDragOver?: boolean
+  onContextMenu?: (e: React.MouseEvent) => void
+  selectionState?: SelectionState | null
+  onToggleNoteSelect?: (noteId: string) => void
+  onDeleteSelected?: () => void
+  onCancelSelection?: () => void
+  onNoteDropOnNote?: (draggedId: string, targetId: string, before: boolean) => void
+  subContent?: React.ReactNode
 }
 
 function TreeSection({
-  sectionId, icon, label, notes, expanded, isDark,
+  sectionId, icon, label, notes, expanded, isDark, depth = 0,
   onToggle, onNewNote, onDelete, onRename, renamingContent,
-  onDropNote, onDropFolder, draggableFolder, onFolderDragStart, folderDragOver,
+  onDropNote, onDropFolder, onNestFolder, draggableFolder, onFolderDragStart,
+  onContextMenu, selectionState, onToggleNoteSelect, onDeleteSelected, onCancelSelection,
+  onNoteDropOnNote, subContent,
 }: TreeSectionProps): JSX.Element {
-  const [noteDropOver, setNoteDropOver] = useState(false)
+  const isSelecting = selectionState?.sectionId === sectionId
+  const selectedCount = isSelecting ? selectionState!.selected.size : 0
+  const [bodyDropOver, setBodyDropOver] = useState(false)
+  const [headerFolderIndicator, setHeaderFolderIndicator] = useState<'reorder' | 'nest' | null>(null)
 
-  const handleDragOver = (e: React.DragEvent): void => {
+  // Outer body: accepts note drops (move to folder) + folder drops in body (nest inside)
+  const handleBodyDragOver = (e: React.DragEvent): void => {
     if (e.dataTransfer.types.includes('dragtype')) {
       e.preventDefault()
-      e.stopPropagation()
-      setNoteDropOver(true)
+      setBodyDropOver(true)
     }
   }
-
-  const handleDragLeave = (e: React.DragEvent): void => {
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setNoteDropOver(false)
-    }
+  const handleBodyDragLeave = (e: React.DragEvent): void => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setBodyDropOver(false)
   }
-
-  const handleDrop = (e: React.DragEvent): void => {
-    e.preventDefault()
-    e.stopPropagation()
-    setNoteDropOver(false)
+  const handleBodyDrop = (e: React.DragEvent): void => {
+    setBodyDropOver(false)
     const type = e.dataTransfer.getData('dragtype')
     if (type === 'note') {
+      e.preventDefault()
       const noteId = e.dataTransfer.getData('noteid')
       if (noteId) onDropNote?.(noteId)
     } else if (type === 'folder') {
+      e.preventDefault()
       const folderId = e.dataTransfer.getData('folderid')
-      if (folderId && folderId !== sectionId) onDropFolder?.(folderId)
+      if (folderId && folderId !== sectionId) onNestFolder?.(folderId)
     }
   }
 
-  const isDropTarget = noteDropOver || folderDragOver
+  // Header: accepts folder drops — top 40% = reorder, bottom 60% = nest
+  const handleHeaderDragOver = (e: React.DragEvent): void => {
+    if (!e.dataTransfer.types.includes('folderid')) return
+    e.preventDefault()
+    e.stopPropagation()
+    const rect = e.currentTarget.getBoundingClientRect()
+    setHeaderFolderIndicator(e.clientY < rect.top + rect.height * 0.4 ? 'reorder' : 'nest')
+  }
+  const handleHeaderDragLeave = (e: React.DragEvent): void => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setHeaderFolderIndicator(null)
+  }
+  const handleHeaderDrop = (e: React.DragEvent): void => {
+    if (e.dataTransfer.getData('dragtype') !== 'folder') return
+    e.preventDefault()
+    e.stopPropagation()
+    setHeaderFolderIndicator(null)
+    const folderId = e.dataTransfer.getData('folderid')
+    if (!folderId || folderId === sectionId) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const isReorder = e.clientY < rect.top + rect.height * 0.4
+    if (isReorder) onDropFolder?.(folderId)
+    else onNestFolder?.(folderId)
+  }
+
+  const nestHighlight = headerFolderIndicator === 'nest'
+  const bodyHighlight = bodyDropOver
 
   return (
     <div
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
+      style={{ marginLeft: depth * 10 }}
+      onDragOver={handleBodyDragOver}
+      onDragLeave={handleBodyDragLeave}
+      onDrop={handleBodyDrop}
     >
-      {/* 섹션 헤더 */}
+      {/* 섹션 헤더 — folder drop indicator line above on reorder */}
+      {headerFolderIndicator === 'reorder' && (
+        <div className="h-0.5 pointer-events-none" style={{ backgroundColor: 'rgba(99,102,241,0.8)' }} />
+      )}
       <div
-        className="group flex items-center w-full border-b transition-colors"
+        className="group flex items-center w-full border-b transition-colors relative"
         style={{
           borderColor: 'var(--app-border)',
-          backgroundColor: isDropTarget ? (isDark ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.08)') : 'transparent',
-          outline: isDropTarget ? `1px dashed ${isDark ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.4)'}` : 'none',
+          backgroundColor: nestHighlight || bodyHighlight
+            ? (isDark ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.08)')
+            : 'transparent',
+          outline: nestHighlight
+            ? `2px solid ${isDark ? 'rgba(99,102,241,0.6)' : 'rgba(99,102,241,0.5)'}`
+            : (bodyHighlight ? `1px dashed ${isDark ? 'rgba(99,102,241,0.4)' : 'rgba(99,102,241,0.3)'}` : 'none'),
           outlineOffset: -1,
         }}
+        onContextMenu={onContextMenu}
+        onDragOver={handleHeaderDragOver}
+        onDragLeave={handleHeaderDragLeave}
+        onDrop={handleHeaderDrop}
       >
         {renamingContent ?? (
           <button
-            className="flex items-center gap-1.5 flex-1 px-2 py-1.5 text-xs text-left min-w-0"
+            className="flex items-center gap-1.5 flex-1 py-1.5 text-xs text-left min-w-0"
+            style={{ paddingLeft: 8, color: 'var(--app-text-muted)' }}
             onClick={onToggle}
-            style={{ color: 'var(--app-text-muted)' }}
             draggable={draggableFolder}
             onDragStart={draggableFolder ? onFolderDragStart : undefined}
           >
@@ -351,7 +536,7 @@ function TreeSection({
               className="text-[7px] flex-shrink-0 transition-transform duration-150"
               style={{ transform: expanded ? 'rotate(90deg)' : 'none', color: 'var(--app-text-dim)' }}
             >▶</span>
-            <span className="flex-shrink-0">{icon}</span>
+            <span className="flex-shrink-0">{nestHighlight ? '📂' : icon}</span>
             <span className="flex-1 truncate font-medium text-[11px]">{label}</span>
             <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--app-text-dim)' }}>{notes.length}</span>
           </button>
@@ -385,18 +570,47 @@ function TreeSection({
         </div>
       </div>
 
-      {/* 메모 목록 */}
+      {/* 선택 모드 바 */}
+      {isSelecting && (
+        <div
+          className="flex items-center gap-1.5 px-2 py-1 border-b w-full text-[10px]"
+          style={{ borderColor: 'var(--app-border)', backgroundColor: isDark ? 'rgba(99,102,241,0.12)' : 'rgba(99,102,241,0.07)' }}
+        >
+          <span style={{ color: 'var(--app-text-muted)', flex: 1 }}>{selectedCount}개 선택됨</span>
+          <button
+            onMouseDown={(e) => { e.stopPropagation(); onDeleteSelected?.() }}
+            className="px-1.5 py-0.5 rounded text-[10px]"
+            style={{ backgroundColor: '#f87171', color: '#fff', opacity: selectedCount === 0 ? 0.4 : 1 }}
+          >삭제</button>
+          <button
+            onMouseDown={(e) => { e.stopPropagation(); onCancelSelection?.() }}
+            className="px-1.5 py-0.5 rounded text-[10px]"
+            style={{ color: 'var(--app-text-muted)', backgroundColor: 'var(--app-hover)' }}
+          >취소</button>
+        </div>
+      )}
+
+      {/* 메모 목록 + 하위 폴더 */}
       {expanded && (
         <div>
-          {notes.length === 0 ? (
+          {notes.length === 0 && !subContent ? (
             <div className="pl-6 py-2 text-[10px]" style={{ color: 'var(--app-text-dim)' }}>
               메모 없음
             </div>
           ) : (
             notes.map((note) => (
-              <NoteCard key={note.id} note={note} isDark={isDark} indent />
+              <NoteReorderWrapper
+                key={note.id}
+                note={note}
+                isDark={isDark}
+                selectionMode={isSelecting}
+                selected={isSelecting && selectionState!.selected.has(note.id)}
+                onToggleSelect={() => onToggleNoteSelect?.(note.id)}
+                onDropOnNote={onNoteDropOnNote}
+              />
             ))
           )}
+          {subContent}
         </div>
       )}
     </div>
@@ -407,14 +621,20 @@ function TreeSection({
 function SidebarTree({
   searchQuery,
   sortBy,
+  setSortBy,
   isDark,
+  addFolderTrigger,
+  onAddFolderTriggered,
 }: {
   searchQuery: string
   sortBy: SortBy
+  setSortBy: (s: SortBy) => void
   isDark: boolean
+  addFolderTrigger: boolean
+  onAddFolderTriggered: () => void
 }): JSX.Element {
-  const { notes, createNote, updateNote } = useNoteStore()
-  const { folders, load, createFolder, renameFolder, deleteFolder, reorderFolders } = useFolderStore()
+  const { notes, createNote, updateNote, deleteNote, reorderNotes } = useNoteStore()
+  const { folders, load, createFolder, renameFolder, deleteFolder, duplicateFolder, nestFolder, reorderFolders, moveFolder } = useFolderStore()
   const { selectedTagId, noteTagMap, loadNoteTagIds } = useTagStore()
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(['uncategorized']))
@@ -423,7 +643,8 @@ function SidebarTree({
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [draggingFolderId, setDraggingFolderId] = useState<string | null>(null)
-  const [folderDragOverId, setFolderDragOverId] = useState<string | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; sectionId: string | null } | null>(null)
+  const [selectionState, setSelectionState] = useState<SelectionState | null>(null)
 
   useEffect(() => { load() }, [load])
 
@@ -487,7 +708,7 @@ function SidebarTree({
 
   // Global dragend to clear folder drag state
   useEffect(() => {
-    const handler = (): void => { setDraggingFolderId(null); setFolderDragOverId(null) }
+    const handler = (): void => { setDraggingFolderId(null) }
     document.addEventListener('dragend', handler)
     return () => document.removeEventListener('dragend', handler)
   }, [])
@@ -507,6 +728,111 @@ function SidebarTree({
     setRenamingId(null)
   }
 
+  useEffect(() => {
+    if (addFolderTrigger) {
+      setAddingFolder(true)
+      onAddFolderTriggered()
+    }
+  }, [addFolderTrigger, onAddFolderTriggered])
+
+  const handleNoteDropOnNote = useCallback((sectionId: string, draggedId: string, targetId: string, before: boolean) => {
+    const targetFolderId = sectionId === 'uncategorized' ? null : sectionId
+    const draggedNote = notes.find((n) => n.id === draggedId)
+    if (!draggedNote) return
+    const sectionNotes = [...notes.filter((n) => n.folderId === targetFolderId)]
+    sectionNotes.sort((a, b) => a.sortOrder - b.sortOrder)
+    const withoutDragged = sectionNotes.filter((n) => n.id !== draggedId)
+    const targetIdx = withoutDragged.findIndex((n) => n.id === targetId)
+    if (targetIdx === -1) return
+    const insertIdx = before ? targetIdx : targetIdx + 1
+    const newOrder = [...withoutDragged.slice(0, insertIdx), draggedNote, ...withoutDragged.slice(insertIdx)]
+    if (draggedNote.folderId !== targetFolderId) {
+      void updateNote(draggedId, { folderId: targetFolderId })
+    }
+    void reorderNotes(newOrder.map((n, i) => ({ id: n.id, sortOrder: i })))
+    setSortBy('manual')
+  }, [notes, updateNote, reorderNotes, setSortBy])
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, sectionId: string | null) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setCtxMenu({ x: e.clientX, y: e.clientY, sectionId })
+  }, [])
+
+  const handleToggleNoteSelect = useCallback((noteId: string) => {
+    setSelectionState((prev) => {
+      if (!prev) return prev
+      const next = new Set(prev.selected)
+      if (next.has(noteId)) next.delete(noteId)
+      else next.add(noteId)
+      return { ...prev, selected: next }
+    })
+  }, [])
+
+  const handleDeleteSelected = useCallback(async () => {
+    if (!selectionState || selectionState.selected.size === 0) return
+    for (const id of selectionState.selected) {
+      await deleteNote(id)
+    }
+    setSelectionState(null)
+  }, [selectionState, deleteNote])
+
+  // Recursive folder renderer
+  function renderFolder(folder: typeof folders[0], depth: number): JSX.Element {
+    const isRenaming = renamingId === folder.id
+    const childFolders = folders
+      .filter((f) => f.parentId === folder.id)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+    return (
+      <TreeSection
+        key={folder.id}
+        sectionId={folder.id}
+        icon="📁"
+        label={folder.name}
+        notes={folderNotes(folder.id)}
+        expanded={expandedIds.has(folder.id)}
+        isDark={isDark}
+        depth={depth}
+        onToggle={() => toggle(folder.id)}
+        onNewNote={() => { createNote({ folderId: folder.id }); setExpandedIds((p) => new Set([...p, folder.id])) }}
+        onRename={() => { setRenamingId(folder.id); setRenameValue(folder.name) }}
+        onDelete={() => deleteFolder(folder.id)}
+        onDropNote={(noteId) => { updateNote(noteId, { folderId: folder.id }) }}
+        onDropFolder={(draggedId) => { void reorderFolders(draggedId, folder.id) }}
+        onNestFolder={(draggedId) => { void nestFolder(draggedId, folder.id) }}
+        draggableFolder
+        onFolderDragStart={handleFolderDragStart(folder.id)}
+        onContextMenu={(e) => handleContextMenu(e, folder.id)}
+        selectionState={selectionState}
+        onToggleNoteSelect={handleToggleNoteSelect}
+        onDeleteSelected={handleDeleteSelected}
+        onCancelSelection={() => setSelectionState(null)}
+        onNoteDropOnNote={(dId, tId, before) => handleNoteDropOnNote(folder.id, dId, tId, before)}
+        renamingContent={isRenaming ? (
+          <input
+            autoFocus
+            className="flex-1 mx-2 my-1 px-2 py-0.5 text-xs rounded outline-none"
+            style={{ backgroundColor: 'var(--app-hover)', color: 'var(--app-text)' }}
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onBlur={() => handleRename(folder.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleRename(folder.id)
+              if (e.key === 'Escape') setRenamingId(null)
+            }}
+          />
+        ) : undefined}
+        subContent={childFolders.length > 0
+          ? <div>{childFolders.map((child) => renderFolder(child, depth + 1))}</div>
+          : undefined}
+      />
+    )
+  }
+
+  const topLevelFolders = folders
+    .filter((f) => !f.parentId)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+
   return (
     <div className="flex-1 overflow-y-auto sidebar-list">
       {/* 미분류 */}
@@ -520,47 +846,52 @@ function SidebarTree({
         onToggle={() => toggle('uncategorized')}
         onNewNote={() => { createNote({ folderId: null }); setExpandedIds((p) => new Set([...p, 'uncategorized'])) }}
         onDropNote={(noteId) => { updateNote(noteId, { folderId: null }) }}
-        folderDragOver={folderDragOverId === 'uncategorized'}
+        onContextMenu={(e) => handleContextMenu(e, null)}
+        selectionState={selectionState}
+        onToggleNoteSelect={handleToggleNoteSelect}
+        onDeleteSelected={handleDeleteSelected}
+        onCancelSelection={() => setSelectionState(null)}
+        onNoteDropOnNote={(dId, tId, before) => handleNoteDropOnNote('uncategorized', dId, tId, before)}
       />
 
-      {/* 사용자 폴더 */}
-      {folders.map((folder) => {
-        const isRenaming = renamingId === folder.id
-        return (
-          <TreeSection
-            key={folder.id}
-            sectionId={folder.id}
-            icon="📁"
-            label={folder.name}
-            notes={folderNotes(folder.id)}
-            expanded={expandedIds.has(folder.id)}
-            isDark={isDark}
-            onToggle={() => toggle(folder.id)}
-            onNewNote={() => { createNote({ folderId: folder.id }); setExpandedIds((p) => new Set([...p, folder.id])) }}
-            onRename={() => { setRenamingId(folder.id); setRenameValue(folder.name) }}
-            onDelete={() => deleteFolder(folder.id)}
-            onDropNote={(noteId) => { updateNote(noteId, { folderId: folder.id }) }}
-            onDropFolder={(folderId) => { void reorderFolders(folderId, folder.id) }}
-            draggableFolder
-            onFolderDragStart={handleFolderDragStart(folder.id)}
-            folderDragOver={folderDragOverId === folder.id && draggingFolderId !== folder.id}
-            renamingContent={isRenaming ? (
-              <input
-                autoFocus
-                className="flex-1 mx-2 my-1 px-2 py-0.5 text-xs rounded outline-none"
-                style={{ backgroundColor: 'var(--app-hover)', color: 'var(--app-text)' }}
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
-                onBlur={() => handleRename(folder.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleRename(folder.id)
-                  if (e.key === 'Escape') setRenamingId(null)
-                }}
-              />
-            ) : undefined}
-          />
-        )
-      })}
+      {/* 사용자 폴더 (재귀적) */}
+      {topLevelFolders.map((folder) => renderFolder(folder, 0))}
+
+      {/* 컨텍스트 메뉴 */}
+      {ctxMenu && (
+        <FolderContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          folderId={ctxMenu.sectionId}
+          folderIdx={(() => {
+            if (!ctxMenu.sectionId) return -1
+            const f = folders.find((f) => f.id === ctxMenu.sectionId)
+            const siblings = folders.filter((s) => s.parentId === (f?.parentId ?? null)).sort((a,b) => a.sortOrder - b.sortOrder)
+            return siblings.findIndex((s) => s.id === ctxMenu.sectionId)
+          })()}
+          folderCount={(() => {
+            if (!ctxMenu.sectionId) return 0
+            const f = folders.find((f) => f.id === ctxMenu.sectionId)
+            return folders.filter((s) => s.parentId === (f?.parentId ?? null)).length
+          })()}
+          isDark={isDark}
+          onClose={() => setCtxMenu(null)}
+          onNewNote={() => {
+            const fId = ctxMenu.sectionId
+            createNote({ folderId: fId })
+            setExpandedIds((p) => new Set([...p, fId ?? 'uncategorized']))
+          }}
+          onNewFolder={() => setAddingFolder(true)}
+          onRename={() => {
+            if (ctxMenu.sectionId) { setRenamingId(ctxMenu.sectionId); setRenameValue(folders.find((f) => f.id === ctxMenu.sectionId)?.name ?? '') }
+          }}
+          onDelete={() => { if (ctxMenu.sectionId) deleteFolder(ctxMenu.sectionId) }}
+          onDuplicate={() => { if (ctxMenu.sectionId) void duplicateFolder(ctxMenu.sectionId) }}
+          onMoveUp={() => { if (ctxMenu.sectionId) void moveFolder(ctxMenu.sectionId, 'up') }}
+          onMoveDown={() => { if (ctxMenu.sectionId) void moveFolder(ctxMenu.sectionId, 'down') }}
+          onSelectDelete={() => setSelectionState({ sectionId: ctxMenu.sectionId ?? 'uncategorized', selected: new Set() })}
+        />
+      )}
 
       {/* 폴더 추가 */}
       {addingFolder ? (
@@ -602,6 +933,7 @@ export function MainPanel(): JSX.Element {
   const [sortBy, setSortBy] = useState<SortBy>('updatedAt')
   const [showSettings, setShowSettings] = useState(false)
   const [showSidebar, setShowSidebar] = useState(true)
+  const [addFolderTrigger, setAddFolderTrigger] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -686,6 +1018,17 @@ export function MainPanel(): JSX.Element {
                   <path d="M2 13.5H13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                 </svg>
               </button>
+              <button
+                onClick={() => setAddFolderTrigger(true)}
+                className="transition-opacity hover:opacity-80"
+                style={{ color: 'var(--app-text-muted)' }}
+                title="새 폴더"
+              >
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                  <path d="M1.5 3.5h4l1.5 2h6.5v7H1.5v-9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                  <path d="M7.5 7.5v3M6 9h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -719,7 +1062,14 @@ export function MainPanel(): JSX.Element {
               불러오는 중...
             </div>
           ) : (
-            <SidebarTree searchQuery={searchQuery} sortBy={sortBy} isDark={isDark} />
+            <SidebarTree
+              searchQuery={searchQuery}
+              sortBy={sortBy}
+              setSortBy={setSortBy}
+              isDark={isDark}
+              addFolderTrigger={addFolderTrigger}
+              onAddFolderTriggered={() => setAddFolderTrigger(false)}
+            />
           )}
 
           {/* 태그 섹션 */}
