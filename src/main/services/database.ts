@@ -2,7 +2,22 @@ import Database from 'better-sqlite3'
 import { app } from 'electron'
 import path from 'path'
 import { v4 as uuidv4 } from 'uuid'
-import type { Note, CreateNotePayload, UpdateNotePayload, NoteColor, AppSettings, ThemeMode, ThemeColor, StartBehavior } from '../../shared/types'
+import type {
+  Note, CreateNotePayload, UpdateNotePayload, NoteColor, AppSettings,
+  ThemeMode, ThemeColor, StartBehavior, ShortcutSettings,
+  Folder, CreateFolderPayload, UpdateFolderPayload,
+  Tag, CreateTagPayload, UpdateTagPayload,
+} from '../../shared/types'
+
+function defaultShortcuts(platform: string): ShortcutSettings {
+  const isMac = platform === 'darwin'
+  return {
+    newNote:       { key: 'n',  meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    searchFocus:   { key: 'f',  meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    openSettings:  { key: ',',  meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    toggleSidebar: { key: '\\', meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+  }
+}
 
 const DEFAULT_SIZE = { width: 280, height: 320 }
 const DEFAULT_COLOR: NoteColor = 'yellow'
@@ -32,13 +47,46 @@ export function initDatabase(): void {
     )
   `)
 
+  // Migration: add new columns if missing
+  const noteColumns = (db.pragma('table_info(notes)') as { name: string }[]).map((c) => c.name)
+  if (!noteColumns.includes('folder_id')) db.exec(`ALTER TABLE notes ADD COLUMN folder_id TEXT`)
+  if (!noteColumns.includes('icon')) db.exec(`ALTER TABLE notes ADD COLUMN icon TEXT`)
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS settings (
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
     )
   `)
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS folders (
+      id         TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    )
+  `)
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tags (
+      id         TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      color      TEXT NOT NULL DEFAULT '#6366f1',
+      created_at TEXT NOT NULL
+    )
+  `)
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS note_tags (
+      note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+      tag_id  TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (note_id, tag_id)
+    )
+  `)
 }
+
+// ── Notes ─────────────────────────────────────────────────────
 
 function rowToNote(row: Record<string, unknown>): Note {
   return {
@@ -50,6 +98,8 @@ function rowToNote(row: Record<string, unknown>): Note {
     size: { width: row.width as number, height: row.height as number },
     isPinned: Boolean(row.is_pinned),
     fontSize: row.font_size as Note['fontSize'],
+    folderId: (row.folder_id as string | null) ?? null,
+    icon: (row.icon as string | null) ?? null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   }
@@ -71,13 +121,15 @@ export function createNote(payload: CreateNotePayload): Note {
     size: DEFAULT_SIZE,
     isPinned: false,
     fontSize: 'md',
+    folderId: payload.folderId ?? null,
+    icon: null,
     createdAt: now,
     updatedAt: now,
   }
 
   db.prepare(`
-    INSERT INTO notes (id, content, color, opacity, pos_x, pos_y, width, height, is_pinned, font_size, created_at, updated_at)
-    VALUES (@id, @content, @color, @opacity, @posX, @posY, @width, @height, @isPinned, @fontSize, @createdAt, @updatedAt)
+    INSERT INTO notes (id, content, color, opacity, pos_x, pos_y, width, height, is_pinned, font_size, folder_id, icon, created_at, updated_at)
+    VALUES (@id, @content, @color, @opacity, @posX, @posY, @width, @height, @isPinned, @fontSize, @folderId, @icon, @createdAt, @updatedAt)
   `).run({
     id: note.id,
     content: note.content,
@@ -89,6 +141,8 @@ export function createNote(payload: CreateNotePayload): Note {
     height: note.size.height,
     isPinned: note.isPinned ? 1 : 0,
     fontSize: note.fontSize,
+    folderId: note.folderId,
+    icon: note.icon,
     createdAt: note.createdAt,
     updatedAt: note.updatedAt,
   })
@@ -101,11 +155,7 @@ export function updateNote(id: string, payload: UpdateNotePayload): Note | null 
   if (!existing) return null
 
   const updatedAt = new Date().toISOString()
-  const merged = {
-    ...rowToNote(existing),
-    ...payload,
-    updatedAt,
-  }
+  const merged = { ...rowToNote(existing), ...payload, updatedAt }
 
   db.prepare(`
     UPDATE notes SET
@@ -118,6 +168,8 @@ export function updateNote(id: string, payload: UpdateNotePayload): Note | null 
       height     = @height,
       is_pinned  = @isPinned,
       font_size  = @fontSize,
+      folder_id  = @folderId,
+      icon       = @icon,
       updated_at = @updatedAt
     WHERE id = @id
   `).run({
@@ -131,6 +183,8 @@ export function updateNote(id: string, payload: UpdateNotePayload): Note | null 
     height: payload.size?.height ?? (existing.height as number),
     isPinned: (payload.isPinned ?? Boolean(existing.is_pinned)) ? 1 : 0,
     fontSize: payload.fontSize ?? (existing.font_size as string),
+    folderId: 'folderId' in payload ? payload.folderId : (existing.folder_id as string | null),
+    icon: 'icon' in payload ? payload.icon : (existing.icon as string | null),
     updatedAt,
   })
 
@@ -142,28 +196,131 @@ export function deleteNote(id: string): boolean {
   return result.changes > 0
 }
 
+// ── Note Tags ─────────────────────────────────────────────────
+
+export function getNoteTagIds(noteId: string): string[] {
+  const rows = db.prepare('SELECT tag_id FROM note_tags WHERE note_id = ?').all(noteId) as { tag_id: string }[]
+  return rows.map((r) => r.tag_id)
+}
+
+export function setNoteTag(noteId: string, tagId: string): void {
+  db.prepare('INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES (?, ?)').run(noteId, tagId)
+}
+
+export function removeNoteTag(noteId: string, tagId: string): void {
+  db.prepare('DELETE FROM note_tags WHERE note_id = ? AND tag_id = ?').run(noteId, tagId)
+}
+
+// ── Folders ───────────────────────────────────────────────────
+
+function rowToFolder(row: Record<string, unknown>): Folder {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    sortOrder: row.sort_order as number,
+    createdAt: row.created_at as string,
+  }
+}
+
+export function getAllFolders(): Folder[] {
+  const rows = db.prepare('SELECT * FROM folders ORDER BY sort_order ASC, created_at ASC').all()
+  return (rows as Record<string, unknown>[]).map(rowToFolder)
+}
+
+export function createFolder(payload: CreateFolderPayload): Folder {
+  const now = new Date().toISOString()
+  const folder: Folder = { id: uuidv4(), name: payload.name, sortOrder: 0, createdAt: now }
+  db.prepare('INSERT INTO folders (id, name, sort_order, created_at) VALUES (@id, @name, @sortOrder, @createdAt)')
+    .run({ id: folder.id, name: folder.name, sortOrder: folder.sortOrder, createdAt: folder.createdAt })
+  return folder
+}
+
+export function updateFolder(id: string, payload: UpdateFolderPayload): Folder | null {
+  const existing = db.prepare('SELECT * FROM folders WHERE id = ?').get(id) as Record<string, unknown> | undefined
+  if (!existing) return null
+  db.prepare('UPDATE folders SET name = @name, sort_order = @sortOrder WHERE id = @id').run({
+    id,
+    name: payload.name ?? (existing.name as string),
+    sortOrder: payload.sortOrder ?? (existing.sort_order as number),
+  })
+  return rowToFolder({ ...existing, name: payload.name ?? existing.name, sort_order: payload.sortOrder ?? existing.sort_order })
+}
+
+export function deleteFolder(id: string): boolean {
+  db.prepare('UPDATE notes SET folder_id = NULL WHERE folder_id = ?').run(id)
+  const result = db.prepare('DELETE FROM folders WHERE id = ?').run(id)
+  return result.changes > 0
+}
+
+// ── Tags ──────────────────────────────────────────────────────
+
+function rowToTag(row: Record<string, unknown>): Tag {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    color: row.color as string,
+    createdAt: row.created_at as string,
+  }
+}
+
+export function getAllTags(): Tag[] {
+  const rows = db.prepare('SELECT * FROM tags ORDER BY created_at ASC').all()
+  return (rows as Record<string, unknown>[]).map(rowToTag)
+}
+
+export function createTag(payload: CreateTagPayload): Tag {
+  const now = new Date().toISOString()
+  const tag: Tag = { id: uuidv4(), name: payload.name, color: payload.color, createdAt: now }
+  db.prepare('INSERT INTO tags (id, name, color, created_at) VALUES (@id, @name, @color, @createdAt)')
+    .run({ id: tag.id, name: tag.name, color: tag.color, createdAt: tag.createdAt })
+  return tag
+}
+
+export function updateTag(id: string, payload: UpdateTagPayload): Tag | null {
+  const existing = db.prepare('SELECT * FROM tags WHERE id = ?').get(id) as Record<string, unknown> | undefined
+  if (!existing) return null
+  db.prepare('UPDATE tags SET name = @name, color = @color WHERE id = @id').run({
+    id,
+    name: payload.name ?? (existing.name as string),
+    color: payload.color ?? (existing.color as string),
+  })
+  return rowToTag({ ...existing, name: payload.name ?? existing.name, color: payload.color ?? existing.color })
+}
+
+export function deleteTag(id: string): boolean {
+  const result = db.prepare('DELETE FROM tags WHERE id = ?').run(id)
+  return result.changes > 0
+}
+
 // ── Settings ──────────────────────────────────────────────────
 
 export function getSettings(): AppSettings {
   const rows = db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[]
   const map: Record<string, string> = Object.fromEntries(rows.map((r) => [r.key, r.value]))
+  let shortcuts = defaultShortcuts(process.platform)
+  if (map['shortcuts']) {
+    try { shortcuts = JSON.parse(map['shortcuts']) } catch { /* use defaults */ }
+  }
   return {
     themeMode: (map['themeMode'] ?? 'dark') as ThemeMode,
     themeColor: (map['themeColor'] ?? 'navy') as ThemeColor,
     startBehavior: (map['startBehavior'] ?? 'main') as StartBehavior,
     spellCheck: map['spellCheck'] === 'true',
+    shortcuts,
   }
 }
 
 export function updateSettings(partial: Partial<AppSettings>): AppSettings {
   const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
   for (const [key, value] of Object.entries(partial)) {
-    if (value !== undefined) stmt.run(key, String(value))
+    if (value === undefined) continue
+    if (key === 'shortcuts') stmt.run(key, JSON.stringify(value))
+    else stmt.run(key, String(value))
   }
   return getSettings()
 }
 
-// ── TXT export helpers ────────────────────────────────────────
+// ── TXT / Markdown export helpers ────────────────────────────
 
 type TipNode = { type?: string; text?: string; content?: TipNode[]; attrs?: Record<string, unknown> }
 
@@ -187,6 +344,46 @@ function nodeToText(node: TipNode, listIndex?: number): string {
     case 'taskItem':    return `[${node.attrs?.checked ? 'x' : ' '}] ${children.trimStart()}`
     case 'blockquote':  return children.split('\n').map((l) => `> ${l}`).join('\n') + '\n'
     case 'codeBlock':   return '```\n' + children + '```\n'
+    case 'callout':     return `> 💡 ${children}`
+    default:            return children
+  }
+}
+
+function nodeToMarkdown(node: TipNode, listIndex?: number): string {
+  if (node.type === 'text') {
+    let text = node.text ?? ''
+    const marks = (node as unknown as { marks?: { type: string; attrs?: Record<string, unknown> }[] }).marks ?? []
+    for (const mark of marks) {
+      if (mark.type === 'bold') text = `**${text}**`
+      else if (mark.type === 'italic') text = `*${text}*`
+      else if (mark.type === 'strike') text = `~~${text}~~`
+      else if (mark.type === 'code') text = `\`${text}\``
+    }
+    return text
+  }
+  if (node.type === 'hardBreak') return '  \n'
+
+  const children = (node.content ?? []).map((c, i) => nodeToMarkdown(c, i + 1)).join('')
+
+  switch (node.type) {
+    case 'doc':       return children
+    case 'paragraph': return children + '\n'
+    case 'heading': {
+      const level = (node.attrs?.level as number) ?? 1
+      return '#'.repeat(level) + ' ' + children + '\n'
+    }
+    case 'bulletList':  return children
+    case 'orderedList': return children
+    case 'listItem':    return `- ${children.trimStart()}`
+    case 'taskList':    return children
+    case 'taskItem':    return `- [${node.attrs?.checked ? 'x' : ' '}] ${children.trimStart()}`
+    case 'blockquote':  return children.split('\n').map((l) => `> ${l}`).join('\n') + '\n'
+    case 'codeBlock': {
+      const lang = (node.attrs?.language as string) ?? ''
+      return `\`\`\`${lang}\n${children}\`\`\`\n`
+    }
+    case 'horizontalRule': return '---\n'
+    case 'callout':     return `> 💡 ${children}`
     default:            return children
   }
 }
@@ -195,8 +392,17 @@ export function noteToPlainText(content: string): string {
   if (!content) return ''
   try {
     const doc = JSON.parse(content) as TipNode
-    // also extract ordered list numbers by tracking index per parent
     return nodeToText(doc).replace(/\n{3,}/g, '\n\n').trim()
+  } catch {
+    return content
+  }
+}
+
+export function noteToMarkdown(content: string): string {
+  if (!content) return ''
+  try {
+    const doc = JSON.parse(content) as TipNode
+    return nodeToMarkdown(doc).replace(/\n{3,}/g, '\n\n').trim()
   } catch {
     return content
   }

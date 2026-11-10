@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Note } from '../../../../shared/types'
 import { useNoteStore } from '../../store/noteStore'
+import { useTagStore } from '../../store/tagStore'
 
 const COLOR_ACCENT: Record<Note['color'], string> = {
   yellow: 'bg-yellow-400',
@@ -109,9 +110,13 @@ function ContextMenu({ x, y, noteId, isWindowOpen, isDark, onClose }: ContextMen
 
 export function NoteCard({ note, isDark = true }: Props): JSX.Element {
   const { selectedId, setSelectedId, openWindowIds } = useNoteStore()
+  const { tags, noteTagMap } = useTagStore()
   const isSelected = selectedId === note.id
   const isWindowOpen = openWindowIds.has(note.id)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
+  const noteTags = (noteTagMap[note.id] ?? [])
+    .map((id) => tags.find((t) => t.id === id))
+    .filter(Boolean) as typeof tags
 
   const handleContextMenu = (e: React.MouseEvent): void => {
     e.preventDefault()
@@ -138,11 +143,22 @@ export function NoteCard({ note, isDark = true }: Props): JSX.Element {
         {/* content */}
         <div className="flex flex-col px-3 py-2.5 flex-1 min-w-0">
           <span className="text-sm truncate leading-snug" style={{ color: 'var(--app-text)' }}>
+            {note.icon && <span className="mr-1">{note.icon}</span>}
             {getTitle(note.content)}
           </span>
-          <span className="text-[11px] mt-0.5" style={{ color: 'var(--app-text-dim)' }}>
-            {formatDate(note.updatedAt)}
-          </span>
+          <div className="flex items-center gap-1 mt-0.5">
+            <span className="text-[11px]" style={{ color: 'var(--app-text-dim)' }}>
+              {formatDate(note.updatedAt)}
+            </span>
+            {noteTags.map((tag) => (
+              <span
+                key={tag.id}
+                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: tag.color }}
+                title={tag.name}
+              />
+            ))}
+          </div>
         </div>
 
         {/* window open indicator dot */}

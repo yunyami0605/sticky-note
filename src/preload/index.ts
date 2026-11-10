@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../shared/types'
-import type { CreateNotePayload, UpdateNotePayload, Note, AppSettings } from '../shared/types'
+import type {
+  CreateNotePayload, UpdateNotePayload, Note, AppSettings,
+  Folder, CreateFolderPayload, UpdateFolderPayload,
+  Tag, CreateTagPayload, UpdateTagPayload,
+} from '../shared/types'
 
 const api = {
   note: {
@@ -14,6 +18,8 @@ const api = {
       ipcRenderer.invoke(IPC.NOTE_EXPORT_TXT, noteId),
     exportAll: (): Promise<{ success: boolean; count?: number }> =>
       ipcRenderer.invoke(IPC.NOTE_EXPORT_ALL),
+    exportMd: (noteId: string): Promise<{ success: boolean; filePath?: string; error?: string }> =>
+      ipcRenderer.invoke(IPC.NOTE_EXPORT_MD, noteId),
     duplicate: (noteId: string): Promise<Note | null> => ipcRenderer.invoke(IPC.NOTE_DUPLICATE, noteId),
     getOpenWindows: (): Promise<string[]> => ipcRenderer.invoke(IPC.NOTE_GET_OPEN_WINDOWS),
     toggleWindow: (noteId: string): Promise<boolean> => ipcRenderer.invoke(IPC.NOTE_TOGGLE_WINDOW, noteId),
@@ -45,12 +51,29 @@ const api = {
     get: (): Promise<AppSettings> => ipcRenderer.invoke(IPC.SETTINGS_GET),
     update: (partial: Partial<AppSettings>): Promise<AppSettings> => ipcRenderer.invoke(IPC.SETTINGS_UPDATE, partial),
   },
+  folder: {
+    getAll: (): Promise<Folder[]> => ipcRenderer.invoke(IPC.FOLDER_GET_ALL),
+    create: (payload: CreateFolderPayload): Promise<Folder> => ipcRenderer.invoke(IPC.FOLDER_CREATE, payload),
+    update: (id: string, payload: UpdateFolderPayload): Promise<Folder | null> => ipcRenderer.invoke(IPC.FOLDER_UPDATE, id, payload),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke(IPC.FOLDER_DELETE, id),
+  },
+  tag: {
+    getAll: (): Promise<Tag[]> => ipcRenderer.invoke(IPC.TAG_GET_ALL),
+    create: (payload: CreateTagPayload): Promise<Tag> => ipcRenderer.invoke(IPC.TAG_CREATE, payload),
+    update: (id: string, payload: UpdateTagPayload): Promise<Tag | null> => ipcRenderer.invoke(IPC.TAG_UPDATE, id, payload),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke(IPC.TAG_DELETE, id),
+    getForNote: (noteId: string): Promise<string[]> => ipcRenderer.invoke(IPC.NOTE_GET_TAGS, noteId),
+    setForNote: (noteId: string, tagId: string): Promise<void> => ipcRenderer.invoke(IPC.NOTE_SET_TAG, noteId, tagId),
+    removeFromNote: (noteId: string, tagId: string): Promise<void> => ipcRenderer.invoke(IPC.NOTE_REMOVE_TAG, noteId, tagId),
+  },
 }
 
 contextBridge.exposeInMainWorld('api', api)
+contextBridge.exposeInMainWorld('platform', process.platform)
 
 declare global {
   interface Window {
     api: typeof api
+    platform: string
   }
 }

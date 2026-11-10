@@ -25,13 +25,24 @@
     "mac": {
       "category": "public.app-category.productivity",
       "target": [
-        { "target": "dmg", "arch": ["x64", "arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "icon": "resources/icon.icns"
     },
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "resources/icon.ico"
     },
@@ -45,8 +56,16 @@
     "dmg": {
       "title": "Sticky Note",
       "contents": [
-        { "x": 130, "y": 220 },
-        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     }
   },
@@ -77,7 +96,9 @@
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
+    "@tiptap/extension-code-block-lowlight": "^3.33.0",
     "@tiptap/extension-color": "^3.32.2",
+    "@tiptap/extension-details": "^3.33.0",
     "@tiptap/extension-font-family": "^3.33.0",
     "@tiptap/extension-heading": "^3.32.2",
     "@tiptap/extension-highlight": "^3.33.0",
@@ -89,7 +110,9 @@
     "@tiptap/pm": "^3.32.2",
     "@tiptap/react": "^3.32.2",
     "@tiptap/starter-kit": "^3.32.2",
+    "@tiptap/suggestion": "^3.33.0",
     "better-sqlite3": "^13.0.3",
+    "lowlight": "^3.3.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "uuid": "^14.0.3",

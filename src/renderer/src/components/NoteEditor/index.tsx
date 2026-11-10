@@ -7,10 +7,18 @@ import Placeholder from '@tiptap/extension-placeholder'
 import Heading from '@tiptap/extension-heading'
 import { TextStyle, FontFamily, FontSize, Color } from '@tiptap/extension-text-style'
 import { Highlight } from '@tiptap/extension-highlight'
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import { Details, DetailsContent, DetailsSummary } from '@tiptap/extension-details'
+import { common, createLowlight } from 'lowlight'
+import { Callout } from '../../extensions/Callout'
+import { SlashCommand } from '../../extensions/SlashCommand'
+import { Mention, MentionNode } from '../../extensions/Mention'
 import type { Note, UpdateNotePayload, NoteColor, FontSize as NoteFontSize } from '../../../../shared/types'
 import { useSettingsStore } from '../../store/settingsStore'
 import { Toolbar } from '../Toolbar'
 import { ColorPicker } from '../ColorPicker'
+
+const lowlight = createLowlight(common)
 
 const FONT_SIZE_CLASS: Record<NoteFontSize, string> = {
   sm: 'text-sm',
@@ -38,7 +46,7 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
 
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ heading: false }),
+      StarterKit.configure({ heading: false, codeBlock: false }),
       Heading.configure({ levels: [1, 2, 3] }),
       TaskList,
       TaskItem.configure({ nested: true }),
@@ -48,6 +56,14 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
       FontSize,
       Color,
       Highlight.configure({ multicolor: true }),
+      CodeBlockLowlight.configure({ lowlight }),
+      Details,
+      DetailsContent,
+      DetailsSummary,
+      Callout,
+      SlashCommand,
+      MentionNode,
+      Mention,
     ],
     content: note.content ? JSON.parse(note.content) : '',
     onUpdate: ({ editor }) => {
@@ -138,6 +154,20 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
           className="flex items-center gap-1.5"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
+          {/* 이모지 아이콘 */}
+          <button
+            title="이모지 아이콘"
+            className="text-sm opacity-60 hover:opacity-100 transition-opacity"
+            onClick={() => {
+              const emoji = prompt('이모지 입력 (비우면 제거)', note.icon ?? '')
+              if (emoji !== null) {
+                onNoteChange({ ...note, icon: emoji || null })
+                window.api.note.update(note.id, { icon: emoji || null })
+              }
+            }}
+          >
+            {note.icon ?? '🏷️'}
+          </button>
           <ColorPicker value={note.color} onChange={handleColorChange} />
         </div>
       </div>

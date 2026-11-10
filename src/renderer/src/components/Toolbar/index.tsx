@@ -436,6 +436,37 @@ export function Toolbar({ editor, dark }: Props): JSX.Element | null {
 
       {divider}
 
+      <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="인용문">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <rect x="1" y="2" width="2" height="9" rx="1" fill="currentColor" opacity="0.8"/>
+          <rect x="5" y="2" width="2" height="9" rx="1" fill="currentColor" opacity="0.5"/>
+          <rect x="8" y="4" width="4" height="1.5" rx="0.75" fill="currentColor" opacity="0.6"/>
+          <rect x="8" y="7" width="3" height="1.5" rx="0.75" fill="currentColor" opacity="0.6"/>
+        </svg>
+      </ToolButton>
+      <ToolButton dark={dark} onClick={() => editor.chain().focus().setHorizontalRule().run()} active={false} title="구분선">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <rect x="1" y="6" width="11" height="1.5" rx="0.75" fill="currentColor" opacity="0.7"/>
+        </svg>
+      </ToolButton>
+      <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} title="코드 블록">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <path d="M4 3L1 6.5L4 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M9 3L12 6.5L9 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </ToolButton>
+      <ToolButton dark={dark} onClick={() => editor.chain().focus().setDetails().run()} active={editor.isActive('details')} title="토글 블록">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <path d="M3 4.5L6.5 8L10 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <rect x="1" y="9.5" width="11" height="1" rx="0.5" fill="currentColor" opacity="0.4"/>
+        </svg>
+      </ToolButton>
+      <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleCallout().run()} active={editor.isActive('callout')} title="콜아웃">
+        💡
+      </ToolButton>
+
+      {divider}
+
       <FontSizePicker editor={editor} dark={dark} />
       <FontFamilyPicker editor={editor} dark={dark} />
       <TextColorPicker editor={editor} dark={dark} />

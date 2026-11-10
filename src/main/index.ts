@@ -4,10 +4,13 @@ import fs from 'fs'
 import { is } from '@electron-toolkit/utils'
 import {
   initDatabase, getAllNotes, createNote, updateNote, deleteNote,
-  getSettings, updateSettings, noteToPlainText, getNoteTitle,
+  getSettings, updateSettings, noteToPlainText, noteToMarkdown, getNoteTitle,
+  getAllFolders, createFolder, updateFolder, deleteFolder,
+  getAllTags, createTag, updateTag, deleteTag,
+  getNoteTagIds, setNoteTag, removeNoteTag,
 } from './services/database'
 import { IPC } from '../shared/types'
-import type { CreateNotePayload, UpdateNotePayload, AppSettings } from '../shared/types'
+import type { CreateNotePayload, UpdateNotePayload, AppSettings, CreateFolderPayload, UpdateFolderPayload, CreateTagPayload, UpdateTagPayload } from '../shared/types'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -264,6 +267,51 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.SETTINGS_UPDATE, (_e, partial: Partial<AppSettings>) => {
     return updateSettings(partial)
   })
+
+  // ── Markdown 내보내기 ─────────────────────────────────────
+  ipcMain.handle(IPC.NOTE_EXPORT_MD, async (_e, noteId: string) => {
+    const notes = getAllNotes()
+    const note = notes.find((n) => n.id === noteId)
+    if (!note) return { success: false, error: '메모를 찾을 수 없습니다.' }
+
+    const title = getNoteTitle(note.content)
+    const safeName = title.replace(/[/\\?%*:|"<>]/g, '_')
+
+    const { filePath } = await dialog.showSaveDialog({
+      title: '마크다운으로 내보내기',
+      defaultPath: `${safeName}.md`,
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+    })
+    if (!filePath) return { success: false }
+
+    fs.writeFileSync(filePath, noteToMarkdown(note.content), 'utf-8')
+    shell.showItemInFolder(filePath)
+    return { success: true, filePath }
+  })
+
+  // ── 폴더 ─────────────────────────────────────────────────
+  ipcMain.handle(IPC.FOLDER_GET_ALL, () => getAllFolders())
+
+  ipcMain.handle(IPC.FOLDER_CREATE, (_e, payload: CreateFolderPayload) => createFolder(payload))
+
+  ipcMain.handle(IPC.FOLDER_UPDATE, (_e, id: string, payload: UpdateFolderPayload) => updateFolder(id, payload))
+
+  ipcMain.handle(IPC.FOLDER_DELETE, (_e, id: string) => deleteFolder(id))
+
+  // ── 태그 ─────────────────────────────────────────────────
+  ipcMain.handle(IPC.TAG_GET_ALL, () => getAllTags())
+
+  ipcMain.handle(IPC.TAG_CREATE, (_e, payload: CreateTagPayload) => createTag(payload))
+
+  ipcMain.handle(IPC.TAG_UPDATE, (_e, id: string, payload: UpdateTagPayload) => updateTag(id, payload))
+
+  ipcMain.handle(IPC.TAG_DELETE, (_e, id: string) => deleteTag(id))
+
+  ipcMain.handle(IPC.NOTE_GET_TAGS, (_e, noteId: string) => getNoteTagIds(noteId))
+
+  ipcMain.handle(IPC.NOTE_SET_TAG, (_e, noteId: string, tagId: string) => { setNoteTag(noteId, tagId) })
+
+  ipcMain.handle(IPC.NOTE_REMOVE_TAG, (_e, noteId: string, tagId: string) => { removeNoteTag(noteId, tagId) })
 }
 
 app.whenReady().then(() => {

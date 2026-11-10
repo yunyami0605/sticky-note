@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { useSettingsStore } from '../../store/settingsStore'
+import { useSettingsStore, isMac } from '../../store/settingsStore'
 import { useNoteStore } from '../../store/noteStore'
-import type { ThemeMode, ThemeColor, StartBehavior } from '../../../../shared/types'
+import type { ThemeMode, ThemeColor, StartBehavior, KeyShortcut, ShortcutSettings } from '../../../../shared/types'
 
 interface Props {
   onClose: () => void
@@ -130,6 +130,120 @@ const LIGHT_COLORS: { value: ThemeColor; label: string; bg: string }[] = [
   { value: 'slate',    label: '슬레이트',  bg: '#f8f8f8' },
 ]
 
+function formatShortcut(sc: KeyShortcut): string {
+  const parts: string[] = []
+  if (sc.meta) parts.push(isMac ? '⌘' : 'Win')
+  if (sc.ctrl) parts.push('Ctrl')
+  if (sc.shift) parts.push(isMac ? '⇧' : 'Shift')
+  if (sc.alt) parts.push(isMac ? '⌥' : 'Alt')
+  parts.push(sc.key === ',' ? ',' : sc.key === '\\' ? '\\' : sc.key.toUpperCase())
+  return parts.join(isMac ? '' : '+')
+}
+
+const DEFAULT_SHORTCUT_LABELS: Record<keyof ShortcutSettings, string> = {
+  newNote: '새 메모',
+  searchFocus: '검색 포커스',
+  openSettings: '설정 열기',
+  toggleSidebar: '사이드바 토글',
+}
+
+function ShortcutsSection({ isDark }: { isDark: boolean }): JSX.Element {
+  const { shortcuts, update } = useSettingsStore()
+  const [capturing, setCapturing] = useState<keyof ShortcutSettings | null>(null)
+  const captureRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!capturing) return
+    const handler = (e: KeyboardEvent): void => {
+      e.preventDefault()
+      if (e.key === 'Escape') { setCapturing(null); return }
+      if (['Meta', 'Control', 'Shift', 'Alt'].includes(e.key)) return
+      const sc: KeyShortcut = {
+        key: e.key.toLowerCase(),
+        meta: e.metaKey,
+        ctrl: e.ctrlKey,
+        shift: e.shiftKey,
+        alt: e.altKey,
+      }
+      update({ shortcuts: { ...shortcuts, [capturing]: sc } })
+      setCapturing(null)
+    }
+    document.addEventListener('keydown', handler, { capture: true })
+    return () => document.removeEventListener('keydown', handler, { capture: true })
+  }, [capturing, shortcuts, update])
+
+  const handleReset = (): void => {
+    const def = isMac
+      ? {
+          newNote:       { key: 'n',  meta: true,  ctrl: false, shift: false, alt: false },
+          searchFocus:   { key: 'f',  meta: true,  ctrl: false, shift: false, alt: false },
+          openSettings:  { key: ',',  meta: true,  ctrl: false, shift: false, alt: false },
+          toggleSidebar: { key: '\\', meta: true,  ctrl: false, shift: false, alt: false },
+        }
+      : {
+          newNote:       { key: 'n',  meta: false, ctrl: true,  shift: false, alt: false },
+          searchFocus:   { key: 'f',  meta: false, ctrl: true,  shift: false, alt: false },
+          openSettings:  { key: ',',  meta: false, ctrl: true,  shift: false, alt: false },
+          toggleSidebar: { key: '\\', meta: false, ctrl: true,  shift: false, alt: false },
+        }
+    update({ shortcuts: def })
+  }
+
+  const shortcutKeys = Object.keys(DEFAULT_SHORTCUT_LABELS) as (keyof ShortcutSettings)[]
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--app-text-muted)' }}>
+          단축키
+        </p>
+        <button
+          onClick={handleReset}
+          className="text-[10px] transition-opacity hover:opacity-80"
+          style={{ color: 'var(--app-text-dim)' }}
+        >
+          기본값 복원
+        </button>
+      </div>
+      <div ref={captureRef} className="flex flex-col gap-1">
+        {shortcutKeys.map((name) => {
+          const isCapturing = capturing === name
+          return (
+            <div
+              key={name}
+              className="flex items-center justify-between px-3 py-1.5 rounded-lg"
+              style={{ backgroundColor: 'var(--app-hover)', border: `1px solid ${isCapturing ? 'var(--app-text-muted)' : 'var(--app-border)'}` }}
+            >
+              <span className="text-xs" style={{ color: 'var(--app-text)' }}>
+                {DEFAULT_SHORTCUT_LABELS[name]}
+              </span>
+              <button
+                onClick={() => setCapturing(isCapturing ? null : name)}
+                className="text-[11px] px-2 py-0.5 rounded font-mono transition-colors"
+                style={{
+                  backgroundColor: isCapturing
+                    ? (isDark ? 'rgba(99,102,241,0.3)' : 'rgba(99,102,241,0.15)')
+                    : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.07)'),
+                  color: isCapturing ? '#818cf8' : 'var(--app-text)',
+                  minWidth: 60,
+                  textAlign: 'center',
+                }}
+              >
+                {isCapturing ? '키 입력...' : formatShortcut(shortcuts[name])}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+      {capturing && (
+        <p className="text-[10px] mt-1.5 text-center" style={{ color: 'var(--app-text-dim)' }}>
+          변경할 단축키를 입력하세요. ESC로 취소.
+        </p>
+      )}
+    </section>
+  )
+}
+
 export function SettingsPanel({ onClose }: Props): JSX.Element {
   const { themeMode, themeColor, startBehavior, spellCheck, update } = useSettingsStore()
   const { notes, selectedId } = useNoteStore()
@@ -154,6 +268,14 @@ export function SettingsPanel({ onClose }: Props): JSX.Element {
     if (!selectedId) return
     setExportStatus('내보내는 중...')
     const result = await window.api.note.exportTxt(selectedId)
+    setExportStatus(result.success ? '저장 완료!' : '취소됨')
+    setTimeout(() => setExportStatus(null), 2000)
+  }
+
+  const handleExportCurrentMd = async (): Promise<void> => {
+    if (!selectedId) return
+    setExportStatus('내보내는 중...')
+    const result = await window.api.note.exportMd(selectedId)
     setExportStatus(result.success ? '저장 완료!' : '취소됨')
     setTimeout(() => setExportStatus(null), 2000)
   }
@@ -298,6 +420,9 @@ export function SettingsPanel({ onClose }: Props): JSX.Element {
             </button>
           </section>
 
+          {/* 단축키 */}
+          <ShortcutsSection isDark={isDark} />
+
           {/* 내보내기 */}
           <section>
             <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--app-text-muted)' }}>
@@ -315,6 +440,18 @@ export function SettingsPanel({ onClose }: Props): JSX.Element {
                 }}
               >
                 현재 메모 내보내기 (.txt)
+              </button>
+              <button
+                onClick={handleExportCurrentMd}
+                disabled={!selectedId}
+                className="w-full py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-30"
+                style={{
+                  backgroundColor: 'var(--app-hover)',
+                  color: 'var(--app-text)',
+                  border: '1px solid var(--app-border)',
+                }}
+              >
+                현재 메모 내보내기 (.md)
               </button>
               <button
                 onClick={handleExportAll}

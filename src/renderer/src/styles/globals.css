@@ -135,3 +135,141 @@
 
 /* Sidebar note list — always show when overflowing */
 .sidebar-list::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.35); }
+
+/* ── 블록 스타일 ───────────────────────────────────────────── */
+
+/* 인용문 (Blockquote) */
+.tiptap blockquote {
+  border-left: 3px solid rgba(128,128,128,0.4);
+  margin: 0.4rem 0;
+  padding: 0.2rem 0 0.2rem 0.75rem;
+  color: inherit;
+  opacity: 0.75;
+}
+
+/* 구분선 (HorizontalRule) */
+.tiptap hr {
+  border: none;
+  border-top: 1.5px solid rgba(128,128,128,0.25);
+  margin: 0.6rem 0;
+}
+
+/* 코드 블록 (CodeBlock) */
+.tiptap pre {
+  background: rgba(0,0,0,0.12);
+  border-radius: 6px;
+  padding: 0.6rem 0.8rem;
+  margin: 0.4rem 0;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 0.82em;
+  line-height: 1.5;
+}
+.tiptap pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* 인라인 코드 */
+.tiptap code {
+  background: rgba(0,0,0,0.1);
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 0.85em;
+}
+
+/* 토글 블록 (Details) */
+.tiptap details {
+  border: 1px solid rgba(128,128,128,0.2);
+  border-radius: 6px;
+  margin: 0.4rem 0;
+  overflow: hidden;
+}
+.tiptap details > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  font-weight: 500;
+  list-style: none;
+  user-select: none;
+  background: rgba(128,128,128,0.06);
+}
+.tiptap details > summary::before {
+  content: '▶';
+  font-size: 0.6em;
+  opacity: 0.6;
+  transition: transform 0.15s;
+  display: inline-block;
+}
+.tiptap details.is-open > summary::before,
+.tiptap details[open] > summary::before {
+  transform: rotate(90deg);
+}
+.tiptap details > div {
+  padding: 0.3rem 0.75rem;
+}
+
+/* 콜아웃 (Callout) */
+.tiptap div[data-type="callout"] {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  background: rgba(128,128,128,0.08);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin: 0.4rem 0;
+  border-left: 3px solid rgba(128,128,128,0.3);
+}
+.tiptap div[data-type="callout"]::before {
+  content: attr(data-emoji);
+  font-size: 1em;
+  flex-shrink: 0;
+  line-height: 1.5;
+}
+
+/* 드래그 핸들 */
+.tiptap .ProseMirror > * {
+  position: relative;
+}
+.tiptap .ProseMirror > *::before {
+  content: '⠿';
+  position: absolute;
+  left: -18px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  opacity: 0;
+  cursor: grab;
+  color: rgba(128,128,128,0.5);
+  transition: opacity 0.1s;
+  user-select: none;
+  line-height: 1;
+}
+.tiptap .ProseMirror > *:hover::before {
+  opacity: 1;
+}
+
+/* @멘션 인라인 */
+.tiptap span[data-mention] {
+  background: rgba(99,102,241,0.15);
+  color: #818cf8;
+  border-radius: 3px;
+  padding: 0 3px;
+  font-size: 0.9em;
+  cursor: pointer;
+}
+
+/* lowlight 코드 하이라이트 (기본 토큰 색) */
+.hljs-comment, .hljs-quote { color: #8b949e; font-style: italic; }
+.hljs-keyword, .hljs-selector-tag { color: #ff7b72; }
+.hljs-string, .hljs-attr { color: #a5d6ff; }
+.hljs-number, .hljs-literal { color: #79c0ff; }
+.hljs-title, .hljs-section { color: #d2a8ff; font-weight: bold; }
+.hljs-variable, .hljs-template-variable { color: #ffa657; }
+.hljs-built_in { color: #ffa657; }
+.hljs-type { color: #79c0ff; }

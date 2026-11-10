@@ -1,11 +1,23 @@
 import { create } from 'zustand'
-import type { AppSettings, ThemeMode, ThemeColor, StartBehavior } from '../../../shared/types'
+import type { AppSettings, ThemeMode, ThemeColor, StartBehavior, ShortcutSettings } from '../../../shared/types'
+
+export const isMac = typeof window !== 'undefined' && window.platform === 'darwin'
+
+function defaultShortcuts(): ShortcutSettings {
+  return {
+    newNote:       { key: 'n',  meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    searchFocus:   { key: 'f',  meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    openSettings:  { key: ',',  meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    toggleSidebar: { key: '\\', meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+  }
+}
 
 interface SettingsStore {
   themeMode: ThemeMode
   themeColor: ThemeColor
   startBehavior: StartBehavior
   spellCheck: boolean
+  shortcuts: ShortcutSettings
   loaded: boolean
   load: () => Promise<void>
   update: (partial: Partial<AppSettings>) => Promise<void>
@@ -16,6 +28,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   themeColor: 'navy',
   startBehavior: 'main',
   spellCheck: false,
+  shortcuts: defaultShortcuts(),
   loaded: false,
 
   load: async () => {
