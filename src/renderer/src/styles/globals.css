@@ -232,26 +232,29 @@
   line-height: 1.5;
 }
 
-/* 드래그 핸들 */
-.tiptap .ProseMirror > * {
-  position: relative;
-}
-.tiptap .ProseMirror > *::before {
-  content: '⠿';
-  position: absolute;
-  left: -18px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 11px;
-  opacity: 0;
+/* 블록 드래그 핸들 */
+.tiptap-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 24px;
   cursor: grab;
   color: rgba(128,128,128,0.5);
-  transition: opacity 0.1s;
-  user-select: none;
-  line-height: 1;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  border-radius: 3px;
+  pointer-events: auto;
 }
-.tiptap .ProseMirror > *:hover::before {
-  opacity: 1;
+.tiptap-drag-handle:hover {
+  opacity: 1 !important;
+  color: rgba(128,128,128,0.9);
+  background: rgba(128,128,128,0.1);
+}
+.tiptap-drag-handle:active {
+  cursor: grabbing;
+}
+.tiptap-drag-handle svg {
+  pointer-events: none;
 }
 
 /* @멘션 인라인 */

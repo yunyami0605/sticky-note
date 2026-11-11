@@ -20,13 +20,14 @@ import { SettingsPanel } from '../SettingsPanel'
 import { Callout } from '../../extensions/Callout'
 import { SlashCommand } from '../../extensions/SlashCommand'
 import { Mention, MentionNode } from '../../extensions/Mention'
+import { DragHandle } from '../../extensions/DragHandle'
 import type { Note, SortBy } from '../../../../shared/types'
 
 const lowlight = createLowlight(common)
 
 // ── 인라인 에디터 ──────────────────────────────────────────────
 function InlineEditor({ isDark }: { isDark: boolean }): JSX.Element | null {
-  const { notes, selectedId, updateNote } = useNoteStore()
+  const { notes, selectedId, updateNote, setSelectedId } = useNoteStore()
   const { spellCheck } = useSettingsStore()
   const note = notes.find((n) => n.id === selectedId) ?? null
 
@@ -49,7 +50,10 @@ function InlineEditor({ isDark }: { isDark: boolean }): JSX.Element | null {
       Callout,
       SlashCommand,
       MentionNode,
-      Mention,
+      Mention.configure({
+        onNavigate: (id) => { setSelectedId(id) },
+      }),
+      DragHandle,
     ],
     content: note?.content ? JSON.parse(note.content) : '',
     onUpdate: ({ editor }) => {

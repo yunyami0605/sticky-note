@@ -1,5 +1,5 @@
 import { Extension, Node, mergeAttributes } from '@tiptap/core'
-import { PluginKey } from '@tiptap/pm/state'
+import { Plugin, PluginKey } from '@tiptap/pm/state'
 import Suggestion from '@tiptap/suggestion'
 
 const MentionPluginKey = new PluginKey('mentionSuggestion')
@@ -102,11 +102,43 @@ export const MentionMenuComponent = forwardRef<MentionMenuHandle, MentionMenuPro
 MentionMenuComponent.displayName = 'MentionMenuComponent'
 
 // ── Mention Extension ─────────────────────────────────────────
-export const Mention = Extension.create({
+export interface MentionOptions {
+  onNavigate?: (id: string) => void
+}
+
+export const Mention = Extension.create<MentionOptions>({
   name: 'mentionSuggestion',
 
+  addOptions() {
+    return { onNavigate: undefined }
+  },
+
   addProseMirrorPlugins() {
+    const { onNavigate } = this.options
+
+    // Click handler for @mention nodes
+    const clickPlugin = new Plugin({
+      key: new PluginKey('mentionClick'),
+      props: {
+        handleDOMEvents: {
+          mousedown: (_view: unknown, event: MouseEvent) => {
+            const target = event.target as HTMLElement
+            const mention = target.closest('[data-mention]') as HTMLElement | null
+            if (!mention) return false
+            const id = mention.getAttribute('data-id')
+            if (id && onNavigate) {
+              event.preventDefault()
+              onNavigate(id)
+              return true
+            }
+            return false
+          },
+        },
+      },
+    })
+
     return [
+      clickPlugin,
       Suggestion({
         pluginKey: MentionPluginKey,
         editor: this.editor,

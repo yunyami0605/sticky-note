@@ -13,6 +13,7 @@ import { common, createLowlight } from 'lowlight'
 import { Callout } from '../../extensions/Callout'
 import { SlashCommand } from '../../extensions/SlashCommand'
 import { Mention, MentionNode } from '../../extensions/Mention'
+import { DragHandle } from '../../extensions/DragHandle'
 import type { Note, UpdateNotePayload, NoteColor, FontSize as NoteFontSize } from '../../../../shared/types'
 import { useSettingsStore } from '../../store/settingsStore'
 import { Toolbar } from '../Toolbar'
@@ -63,7 +64,10 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
       Callout,
       SlashCommand,
       MentionNode,
-      Mention,
+      Mention.configure({
+        onNavigate: (id) => { window.api.note.openWindow(id) },
+      }),
+      DragHandle,
     ],
     content: note.content ? JSON.parse(note.content) : '',
     onUpdate: ({ editor }) => {
