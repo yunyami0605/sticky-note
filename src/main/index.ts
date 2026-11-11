@@ -137,7 +137,19 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle(IPC.NOTE_UPDATE, (_e, id: string, payload: UpdateNotePayload) => {
-    return updateNote(id, payload)
+    const updated = updateNote(id, payload)
+    // Broadcast to all windows except the sender so they stay in sync
+    const sender = _e.sender
+    const allContents = [
+      mainWindow?.webContents,
+      ...Array.from(noteWindows.values()).map((w) => (!w.isDestroyed() ? w.webContents : null)),
+    ]
+    for (const wc of allContents) {
+      if (wc && !wc.isDestroyed() && wc !== sender) {
+        wc.send('note:updated', updated)
+      }
+    }
+    return updated
   })
 
   ipcMain.handle(IPC.NOTE_DELETE, (_e, id: string) => {

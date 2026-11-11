@@ -16,6 +16,11 @@ function NoteApp(): JSX.Element | null {
       const found = notes.find((n) => n.id === id)
       if (found) setNote(found)
     })
+
+    const unsub = window.api.note.onUpdated((updated) => {
+      if (updated.id === id) setNote(updated)
+    })
+    return unsub
   }, [])
 
   if (!note) return null

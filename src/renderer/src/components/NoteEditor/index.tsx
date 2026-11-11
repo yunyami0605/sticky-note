@@ -74,7 +74,7 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
       if (saveTimer.current) clearTimeout(saveTimer.current)
       saveTimer.current = setTimeout(() => {
         persistUpdate({ content: JSON.stringify(editor.getJSON()) })
-      }, 500)
+      }, 150)
     },
   })
 
@@ -185,7 +185,7 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
       </div>
 
       {/* editor area */}
-      <div className={`flex-1 overflow-y-auto px-3 py-2 ${FONT_SIZE_CLASS[note.fontSize]}`}>
+      <div className={`flex-1 overflow-y-auto pl-8 pr-3 py-2 ${FONT_SIZE_CLASS[note.fontSize]}`}>
         <EditorContent editor={editor} className="tiptap h-full" spellCheck={spellCheck} />
       </div>
 

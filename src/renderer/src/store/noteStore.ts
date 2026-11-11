@@ -18,6 +18,7 @@ interface NoteStore {
   setWindowOpen: (id: string, open: boolean) => void
   _addNote: (note: Note) => void
   _removeNote: (id: string) => void
+  _syncNote: (note: Note) => void
 }
 
 export const useNoteStore = create<NoteStore>((set, get) => ({
@@ -111,4 +112,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       selectedId: selectedId === id ? (next[0]?.id ?? null) : selectedId,
     })
   },
+
+  _syncNote: (note) =>
+    set((s) => ({ notes: s.notes.map((n) => (n.id === note.id ? note : n)) })),
 }))

@@ -42,6 +42,10 @@ const api = {
       ipcRenderer.on('note:windowClosed', (_e, id) => cb(id))
       return () => ipcRenderer.removeAllListeners('note:windowClosed')
     },
+    onUpdated: (cb: (note: Note) => void) => {
+      ipcRenderer.on('note:updated', (_e, note) => cb(note))
+      return () => ipcRenderer.removeAllListeners('note:updated')
+    },
   },
   window: {
     setPin: (noteId: string, pinned: boolean): Promise<Note | null> => ipcRenderer.invoke(IPC.WINDOW_SET_PIN, noteId, pinned),

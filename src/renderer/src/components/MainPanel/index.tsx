@@ -30,6 +30,7 @@ function InlineEditor({ isDark }: { isDark: boolean }): JSX.Element | null {
   const { notes, selectedId, updateNote, setSelectedId } = useNoteStore()
   const { spellCheck } = useSettingsStore()
   const note = notes.find((n) => n.id === selectedId) ?? null
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const editor = useEditor({
     extensions: [
@@ -58,16 +59,21 @@ function InlineEditor({ isDark }: { isDark: boolean }): JSX.Element | null {
     content: note?.content ? JSON.parse(note.content) : '',
     onUpdate: ({ editor }) => {
       if (!selectedId) return
-      updateNote(selectedId, { content: JSON.stringify(editor.getJSON()) })
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      saveTimer.current = setTimeout(() => {
+        updateNote(selectedId, { content: JSON.stringify(editor.getJSON()) })
+      }, 150)
     },
   })
 
   useEffect(() => {
     if (!editor || !note) return
     const incoming = note.content ? JSON.parse(note.content) : ''
-    editor.commands.setContent(incoming, false)
+    if (JSON.stringify(incoming) !== JSON.stringify(editor.getJSON())) {
+      editor.commands.setContent(incoming, false)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId])
+  }, [selectedId, note?.content])
 
   if (!note) {
     return (
@@ -83,7 +89,7 @@ function InlineEditor({ isDark }: { isDark: boolean }): JSX.Element | null {
     <div className="flex flex-col flex-1 min-w-0 h-full">
       <div className="h-7 flex-shrink-0" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
       <div
-        className={`${isDark ? 'dark-editor' : ''} flex-1 overflow-y-auto px-6 py-4 text-sm`}
+        className={`${isDark ? 'dark-editor' : ''} flex-1 overflow-y-auto pl-10 pr-6 py-4 text-sm`}
         style={{ color: 'var(--app-text)' }}
       >
         <EditorContent editor={editor} className="tiptap h-full" spellCheck={spellCheck} />
@@ -929,7 +935,7 @@ function SidebarTree({
 
 // ── 메인 패널 ─────────────────────────────────────────────────
 export function MainPanel(): JSX.Element {
-  const { notes, isLoading, loadNotes, createNote, _addNote, _removeNote, setWindowOpen } = useNoteStore()
+  const { notes, isLoading, loadNotes, createNote, _addNote, _removeNote, setWindowOpen, _syncNote } = useNoteStore()
   const { themeMode, themeColor, loaded, load: loadSettings, shortcuts } = useSettingsStore()
   const isDark = themeMode === 'dark'
 
@@ -945,9 +951,10 @@ export function MainPanel(): JSX.Element {
     loadNotes()
     const offCreated = window.api.note.onCreated(_addNote)
     const offDeleted = window.api.note.onDeleted(_removeNote)
+    const offUpdated = window.api.note.onUpdated(_syncNote)
     const offWinOpened = window.api.note.onWindowOpened((id) => setWindowOpen(id, true))
     const offWinClosed = window.api.note.onWindowClosed((id) => setWindowOpen(id, false))
-    return () => { offCreated(); offDeleted(); offWinOpened(); offWinClosed() }
+    return () => { offCreated(); offDeleted(); offUpdated(); offWinOpened(); offWinClosed() }
   }, [loadNotes, _addNote, _removeNote, loadSettings, setWindowOpen])
 
   useEffect(() => {
