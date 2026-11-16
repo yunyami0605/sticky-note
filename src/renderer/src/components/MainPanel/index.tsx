@@ -28,7 +28,7 @@ const lowlight = createLowlight(common)
 // ── 인라인 에디터 ──────────────────────────────────────────────
 function InlineEditor({ isDark }: { isDark: boolean }): JSX.Element | null {
   const { notes, selectedId, updateNote, setSelectedId } = useNoteStore()
-  const { spellCheck } = useSettingsStore()
+  const { spellCheck, editorFontSize, editorTextColor } = useSettingsStore()
   const note = notes.find((n) => n.id === selectedId) ?? null
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -77,10 +77,12 @@ function InlineEditor({ isDark }: { isDark: boolean }): JSX.Element | null {
 
   if (!note) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <p className="text-sm" style={{ color: 'var(--app-text-dim)' }}>
-          메모를 선택하세요
-        </p>
+      <div className="flex flex-col flex-1 items-center justify-center gap-3" style={{ opacity: 0.25 }}>
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none" style={{ color: 'var(--app-text)' }}>
+          <rect x="7" y="6" width="30" height="32" rx="3" stroke="currentColor" strokeWidth="1.6"/>
+          <path d="M14 15h16M14 21h16M14 27h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+        </svg>
+        <p className="text-sm font-medium" style={{ color: 'var(--app-text)' }}>메모를 선택하세요</p>
       </div>
     )
   }
@@ -89,8 +91,8 @@ function InlineEditor({ isDark }: { isDark: boolean }): JSX.Element | null {
     <div className="flex flex-col flex-1 min-w-0 h-full">
       <div className="h-7 flex-shrink-0" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
       <div
-        className={`${isDark ? 'dark-editor' : ''} flex-1 overflow-y-auto pl-10 pr-6 py-4 text-sm`}
-        style={{ color: 'var(--app-text)' }}
+        className={`${isDark ? 'dark-editor' : ''} flex-1 overflow-y-auto pl-10 pr-6 py-4`}
+        style={{ color: editorTextColor || 'var(--app-text)', fontSize: editorFontSize }}
       >
         <EditorContent editor={editor} className="tiptap h-full" spellCheck={spellCheck} />
       </div>
@@ -470,31 +472,45 @@ function TreeSection({
     const type = e.dataTransfer.getData('dragtype')
     if (type === 'note') {
       e.preventDefault()
+      e.stopPropagation()
       const noteId = e.dataTransfer.getData('noteid')
       if (noteId) onDropNote?.(noteId)
     } else if (type === 'folder') {
       e.preventDefault()
+      e.stopPropagation()
       const folderId = e.dataTransfer.getData('folderid')
       if (folderId && folderId !== sectionId) onNestFolder?.(folderId)
     }
   }
 
-  // Header: accepts folder drops — top 40% = reorder, bottom 60% = nest
+  // Header: accepts note drops (move to folder) + folder drops (reorder/nest)
   const handleHeaderDragOver = (e: React.DragEvent): void => {
-    if (!e.dataTransfer.types.includes('folderid')) return
+    if (!e.dataTransfer.types.includes('dragtype')) return
     e.preventDefault()
     e.stopPropagation()
-    const rect = e.currentTarget.getBoundingClientRect()
-    setHeaderFolderIndicator(e.clientY < rect.top + rect.height * 0.4 ? 'reorder' : 'nest')
+    if (e.dataTransfer.types.includes('folderid')) {
+      const rect = e.currentTarget.getBoundingClientRect()
+      setHeaderFolderIndicator(e.clientY < rect.top + rect.height * 0.4 ? 'reorder' : 'nest')
+    } else {
+      setHeaderFolderIndicator('nest')
+    }
   }
   const handleHeaderDragLeave = (e: React.DragEvent): void => {
     if (!e.currentTarget.contains(e.relatedTarget as Node)) setHeaderFolderIndicator(null)
   }
   const handleHeaderDrop = (e: React.DragEvent): void => {
-    if (e.dataTransfer.getData('dragtype') !== 'folder') return
+    const type = e.dataTransfer.getData('dragtype')
+    setHeaderFolderIndicator(null)
+    if (type === 'note') {
+      e.preventDefault()
+      e.stopPropagation()
+      const noteId = e.dataTransfer.getData('noteid')
+      if (noteId) onDropNote?.(noteId)
+      return
+    }
+    if (type !== 'folder') return
     e.preventDefault()
     e.stopPropagation()
-    setHeaderFolderIndicator(null)
     const folderId = e.dataTransfer.getData('folderid')
     if (!folderId || folderId === sectionId) return
     const rect = e.currentTarget.getBoundingClientRect()
@@ -542,13 +558,19 @@ function TreeSection({
             draggable={draggableFolder}
             onDragStart={draggableFolder ? onFolderDragStart : undefined}
           >
-            <span
-              className="text-[7px] flex-shrink-0 transition-transform duration-150"
+            <svg
+              className="flex-shrink-0 transition-transform duration-150"
+              width="8" height="8" viewBox="0 0 8 8" fill="none"
               style={{ transform: expanded ? 'rotate(90deg)' : 'none', color: 'var(--app-text-dim)' }}
-            >▶</span>
+            >
+              <path d="M2 1.5L5.5 4L2 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
             <span className="flex-shrink-0">{nestHighlight ? '📂' : icon}</span>
             <span className="flex-1 truncate font-medium text-[11px]">{label}</span>
-            <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--app-text-dim)' }}>{notes.length}</span>
+            <span
+              className="text-[9px] flex-shrink-0 px-1.5 py-0.5 rounded-full tabular-nums"
+              style={{ color: 'var(--app-text-dim)', backgroundColor: 'var(--app-hover)' }}
+            >{notes.length}</span>
           </button>
         )}
         <div
@@ -604,7 +626,7 @@ function TreeSection({
       {expanded && (
         <div>
           {notes.length === 0 && !subContent ? (
-            <div className="pl-6 py-2 text-[10px]" style={{ color: 'var(--app-text-dim)' }}>
+            <div className="pl-8 py-2 text-[10px] italic" style={{ color: 'var(--app-text-dim)', opacity: 0.7 }}>
               메모 없음
             </div>
           ) : (
@@ -935,12 +957,12 @@ function SidebarTree({
 
 // ── 메인 패널 ─────────────────────────────────────────────────
 export function MainPanel(): JSX.Element {
-  const { notes, isLoading, loadNotes, createNote, _addNote, _removeNote, setWindowOpen, _syncNote } = useNoteStore()
-  const { themeMode, themeColor, loaded, load: loadSettings, shortcuts } = useSettingsStore()
+  const { notes, isLoading, loadNotes, createNote, deleteNote, duplicateNote, openNoteWindow, selectedId, setSelectedId, _addNote, _removeNote, setWindowOpen, _syncNote } = useNoteStore()
+  const { themeMode, themeColor, loaded, load: loadSettings, shortcuts, update: updateSettings } = useSettingsStore()
   const isDark = themeMode === 'dark'
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState<SortBy>('updatedAt')
+  const [sortBy, setSortBy] = useState<SortBy>('manual')
   const [showSettings, setShowSettings] = useState(false)
   const [showSidebar, setShowSidebar] = useState(true)
   const [addFolderTrigger, setAddFolderTrigger] = useState(false)
@@ -979,11 +1001,37 @@ export function MainPanel(): JSX.Element {
       } else if (matchShortcut(e, shortcuts.toggleSidebar)) {
         e.preventDefault()
         setShowSidebar((v) => !v)
+      } else if (matchShortcut(e, shortcuts.deleteNote)) {
+        if (selectedId && document.activeElement?.tagName !== 'INPUT') {
+          e.preventDefault()
+          deleteNote(selectedId)
+        }
+      } else if (matchShortcut(e, shortcuts.duplicateNote)) {
+        if (selectedId) {
+          e.preventDefault()
+          duplicateNote(selectedId)
+        }
+      } else if (matchShortcut(e, shortcuts.openWindow)) {
+        if (selectedId) {
+          e.preventDefault()
+          openNoteWindow(selectedId)
+        }
+      } else if (matchShortcut(e, shortcuts.prevNote)) {
+        e.preventDefault()
+        const idx = notes.findIndex((n) => n.id === selectedId)
+        if (idx > 0) setSelectedId(notes[idx - 1].id)
+      } else if (matchShortcut(e, shortcuts.nextNote)) {
+        e.preventDefault()
+        const idx = notes.findIndex((n) => n.id === selectedId)
+        if (idx < notes.length - 1) setSelectedId(notes[idx + 1].id)
+      } else if (matchShortcut(e, shortcuts.toggleTheme)) {
+        e.preventDefault()
+        updateSettings({ themeMode: themeMode === 'dark' ? 'light' : 'dark' })
       }
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [shortcuts, createNote])
+  }, [shortcuts, createNote, deleteNote, duplicateNote, openNoteWindow, selectedId, setSelectedId, notes, themeMode, updateSettings])
 
   if (!loaded) return <div className="flex h-screen" style={{ backgroundColor: 'var(--app-main)' }} />
 
@@ -1002,53 +1050,71 @@ export function MainPanel(): JSX.Element {
         >
           {/* 헤더 */}
           <div
-            className="flex items-center justify-between px-3 py-2.5 border-b flex-shrink-0"
+            className="flex flex-col border-b flex-shrink-0"
             style={{ borderColor: 'var(--app-border)', WebkitAppRegion: 'drag' } as React.CSSProperties}
           >
+            {/* 트래픽 라이트 공간 — 에디터 패널 h-7 스페이서와 높이 맞춤 */}
+            <div className="h-7 flex-shrink-0" />
+            <div className="flex items-center justify-between px-2.5 pt-2 pb-0.5">
             <SortDropdown sortBy={sortBy} onChange={setSortBy} />
-            <div className="flex items-center gap-1.5" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-              <button
-                onClick={() => setShowSettings((v) => !v)}
-                className="transition-opacity hover:opacity-80"
-                style={{ color: showSettings ? 'var(--app-text)' : 'var(--app-text-muted)' }}
-                title="설정"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <circle cx="7" cy="7" r="2" stroke="currentColor" strokeWidth="1.2"/>
-                  <path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.9 2.9l1.1 1.1M9.9 9.9l1.1 1.1M2.9 11.1l1.1-1.1M9.9 4.1l1.1-1.1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                </svg>
-              </button>
-              <button
-                onClick={() => createNote({})}
-                className="transition-opacity hover:opacity-80"
-                style={{ color: 'var(--app-text-muted)' }}
-                title="새 메모"
-              >
-                <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-                  <path d="M11.5 1.5L13.5 3.5L5.5 11.5H3.5V9.5L11.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-                  <path d="M2 13.5H13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                </svg>
-              </button>
-              <button
-                onClick={() => setAddFolderTrigger(true)}
-                className="transition-opacity hover:opacity-80"
-                style={{ color: 'var(--app-text-muted)' }}
-                title="새 폴더"
-              >
-                <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-                  <path d="M1.5 3.5h4l1.5 2h6.5v7H1.5v-9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-                  <path d="M7.5 7.5v3M6 9h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                </svg>
-              </button>
+            <div className="flex items-center gap-0.5" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+              {([
+                {
+                  title: '설정',
+                  active: showSettings,
+                  onClick: () => setShowSettings((v) => !v),
+                  icon: (
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <circle cx="7" cy="7" r="2" stroke="currentColor" strokeWidth="1.3"/>
+                      <path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.9 2.9l1.1 1.1M9.9 9.9l1.1 1.1M2.9 11.1l1.1-1.1M9.9 4.1l1.1-1.1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                    </svg>
+                  ),
+                },
+                {
+                  title: '새 메모',
+                  active: false,
+                  onClick: () => createNote({}),
+                  icon: (
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path d="M10.5 1.5L12.5 3.5L5.5 10.5H3.5V8.5L10.5 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+                      <path d="M2 12.5H12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                    </svg>
+                  ),
+                },
+                {
+                  title: '새 폴더',
+                  active: false,
+                  onClick: () => setAddFolderTrigger(true),
+                  icon: (
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path d="M1.5 3h3.5l1.5 2h6v6.5H1.5V3Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+                      <path d="M7 7v2.5M5.75 8.25H8.25" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                    </svg>
+                  ),
+                },
+              ] as { title: string; active: boolean; onClick: () => void; icon: React.ReactNode }[]).map(({ title, active, onClick, icon }) => (
+                <button
+                  key={title}
+                  onClick={onClick}
+                  title={title}
+                  className="w-7 h-7 flex items-center justify-center rounded-md transition-colors"
+                  style={{ color: active ? 'var(--app-text)' : 'var(--app-text-muted)' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--app-hover)' }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '' }}
+                >
+                  {icon}
+                </button>
+              ))}
+            </div>
             </div>
           </div>
 
           {/* 검색창 */}
-          <div className="px-2 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--app-border)' }}>
+          <div className="px-2.5 pt-1 pb-2 border-b flex-shrink-0" style={{ borderColor: 'var(--app-border)' }}>
             <div className="relative flex items-center">
-              <svg className="absolute left-2 pointer-events-none" width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ color: 'var(--app-text-dim)' }}>
-                <circle cx="4.5" cy="4.5" r="3.5" stroke="currentColor" strokeWidth="1.2"/>
-                <path d="M7.5 7.5L10 10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              <svg className="absolute left-2.5 pointer-events-none" width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ color: 'var(--app-text-dim)' }}>
+                <circle cx="4.5" cy="4.5" r="3.5" stroke="currentColor" strokeWidth="1.3"/>
+                <path d="M7.5 7.5L10 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
               </svg>
               <input
                 ref={searchInputRef}
@@ -1056,11 +1122,22 @@ export function MainPanel(): JSX.Element {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="검색..."
-                className="w-full text-xs rounded-md pl-6 pr-2 py-1 outline-none"
-                style={{ backgroundColor: 'var(--app-hover)', color: 'var(--app-text)', caretColor: 'var(--app-text)' }}
+                className="w-full text-xs rounded-lg pl-7 pr-6 py-1.5 outline-none transition-colors"
+                style={{
+                  backgroundColor: 'var(--app-hover)',
+                  color: 'var(--app-text)',
+                  caretColor: 'var(--app-text)',
+                  border: '1px solid var(--app-border)',
+                }}
+                onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = 'rgba(99,102,241,0.4)' }}
+                onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--app-border)' }}
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-1.5 text-xs" style={{ color: 'var(--app-text-dim)' }}>
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 w-4 h-4 flex items-center justify-center rounded-full text-[10px] transition-opacity hover:opacity-100"
+                  style={{ color: 'var(--app-text-dim)', backgroundColor: 'var(--app-active)', opacity: 0.7 }}
+                >
                   ×
                 </button>
               )}

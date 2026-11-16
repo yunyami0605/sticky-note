@@ -5,10 +5,16 @@ export const isMac = typeof window !== 'undefined' && window.platform === 'darwi
 
 function defaultShortcuts(): ShortcutSettings {
   return {
-    newNote:       { key: 'n',  meta: isMac,  ctrl: !isMac, shift: false, alt: false },
-    searchFocus:   { key: 'f',  meta: isMac,  ctrl: !isMac, shift: false, alt: false },
-    openSettings:  { key: ',',  meta: isMac,  ctrl: !isMac, shift: false, alt: false },
-    toggleSidebar: { key: '\\', meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    newNote:       { key: 'n',         meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    searchFocus:   { key: 'f',         meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    openSettings:  { key: ',',         meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    toggleSidebar: { key: '\\',        meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    deleteNote:    { key: 'backspace',  meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    duplicateNote: { key: 'd',         meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    openWindow:    { key: 'enter',     meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    prevNote:      { key: 'arrowup',   meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    nextNote:      { key: 'arrowdown', meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    toggleTheme:   { key: 'l',         meta: isMac,  ctrl: !isMac, shift: true,  alt: false },
   }
 }
 
@@ -17,6 +23,8 @@ interface SettingsStore {
   themeColor: ThemeColor
   startBehavior: StartBehavior
   spellCheck: boolean
+  editorFontSize: number
+  editorTextColor: string
   shortcuts: ShortcutSettings
   loaded: boolean
   load: () => Promise<void>
@@ -28,6 +36,8 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   themeColor: 'navy',
   startBehavior: 'main',
   spellCheck: false,
+  editorFontSize: 14,
+  editorTextColor: '',
   shortcuts: defaultShortcuts(),
   loaded: false,
 

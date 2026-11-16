@@ -59,6 +59,12 @@ export interface ShortcutSettings {
   searchFocus: KeyShortcut
   openSettings: KeyShortcut
   toggleSidebar: KeyShortcut
+  deleteNote: KeyShortcut
+  duplicateNote: KeyShortcut
+  openWindow: KeyShortcut
+  prevNote: KeyShortcut
+  nextNote: KeyShortcut
+  toggleTheme: KeyShortcut
 }
 
 export interface AppSettings {
@@ -66,6 +72,8 @@ export interface AppSettings {
   themeColor: ThemeColor
   startBehavior: StartBehavior
   spellCheck: boolean
+  editorFontSize: number
+  editorTextColor: string
   shortcuts: ShortcutSettings
 }
 

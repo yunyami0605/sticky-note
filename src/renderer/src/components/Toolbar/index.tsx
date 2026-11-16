@@ -19,14 +19,48 @@ function ToolButton({ onClick, active, title, dark, children }: ToolButtonProps)
     <button
       onMouseDown={(e) => { e.preventDefault(); onClick() }}
       title={title}
-      className={`w-6 h-6 flex items-center justify-center rounded text-xs font-medium transition-colors
-        ${dark
-          ? active ? 'bg-white/20 text-white' : 'text-white/50 hover:bg-white/10 hover:text-white/80'
-          : active ? 'bg-black/20 text-current' : 'hover:bg-black/10'
-        }`}
+      className="w-6 h-6 flex items-center justify-center rounded-md text-xs font-medium transition-all"
+      style={{
+        backgroundColor: active
+          ? (dark ? 'rgba(99,102,241,0.3)' : 'rgba(99,102,241,0.14)')
+          : 'transparent',
+        color: active
+          ? (dark ? '#a5b4fc' : '#6366f1')
+          : (dark ? 'rgba(255,255,255,0.48)' : 'rgba(0,0,0,0.42)'),
+      }}
+      onMouseEnter={(e) => {
+        if (!active) {
+          (e.currentTarget as HTMLButtonElement).style.backgroundColor = dark
+            ? 'rgba(255,255,255,0.08)'
+            : 'rgba(0,0,0,0.06)'
+          ;(e.currentTarget as HTMLButtonElement).style.color = dark
+            ? 'rgba(255,255,255,0.8)'
+            : 'rgba(0,0,0,0.72)'
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!active) {
+          (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'
+          ;(e.currentTarget as HTMLButtonElement).style.color = dark
+            ? 'rgba(255,255,255,0.48)'
+            : 'rgba(0,0,0,0.42)'
+        }
+      }}
     >
       {children}
     </button>
+  )
+}
+
+// ── 버튼 그룹 컨테이너 ───────────────────────────────────────
+function ToolGroup({ children, dark }: { children: React.ReactNode; dark?: boolean }): JSX.Element {
+  return (
+    <div
+      className="flex items-center rounded-md px-0.5"
+      style={{ backgroundColor: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}
+    >
+      {children}
+    </div>
   )
 }
 
@@ -74,16 +108,26 @@ function FontSizePicker({ editor, dark }: { editor: Editor; dark?: boolean }): J
       <button
         onMouseDown={(e) => { e.preventDefault(); setOpen((v) => !v) }}
         title="글자 크기"
-        className={`h-6 px-1.5 rounded text-xs font-medium transition-colors min-w-[32px]
-          ${dark ? 'text-white/50 hover:bg-white/10 hover:text-white/80' : 'hover:bg-black/10'}`}
+        className="h-6 px-1.5 rounded-md text-xs font-medium transition-colors min-w-[32px]"
+        style={{
+          color: dark ? 'rgba(255,255,255,0.48)' : 'rgba(0,0,0,0.42)',
+          backgroundColor: open ? (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)') : 'transparent',
+        }}
       >
         {current}
       </button>
       {open && (
-        <div className={`absolute bottom-full left-0 mb-1 rounded-lg shadow-xl border z-50 overflow-hidden w-28
-          ${dark ? 'bg-[#1a1a2e] border-white/10' : 'bg-white border-black/10'}`}
+        <div
+          className="absolute bottom-full left-0 mb-1.5 rounded-xl shadow-2xl border z-50 overflow-hidden w-28"
+          style={{
+            backgroundColor: dark ? '#1e1e2e' : '#ffffff',
+            borderColor: dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)',
+          }}
         >
-          <div className={`flex items-center gap-1 px-2 py-1.5 border-b ${dark ? 'border-white/10' : 'border-black/10'}`}>
+          <div
+            className="flex items-center gap-1 px-2 py-1.5 border-b"
+            style={{ borderColor: dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }}
+          >
             <input
               ref={inputRef}
               type="number"
@@ -93,30 +137,42 @@ function FontSizePicker({ editor, dark }: { editor: Editor; dark?: boolean }): J
               onChange={(e) => setCustomInput(e.target.value)}
               onKeyDown={handleCustomKeyDown}
               placeholder={current}
-              className={`w-full text-xs rounded px-1.5 py-0.5 outline-none
-                ${dark ? 'bg-white/10 text-white placeholder-white/30' : 'bg-black/5 text-black placeholder-black/30'}`}
+              className="w-full text-xs rounded-md px-1.5 py-0.5 outline-none"
+              style={{
+                backgroundColor: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                color: dark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.8)',
+              }}
             />
             <button
               onMouseDown={(e) => { e.preventDefault(); apply(customInput) }}
-              className={`text-xs px-1.5 py-0.5 rounded transition-colors whitespace-nowrap
-                ${dark ? 'bg-white/15 text-white hover:bg-white/25' : 'bg-black/10 hover:bg-black/20'}`}
+              className="text-xs px-1.5 py-0.5 rounded-md transition-colors whitespace-nowrap"
+              style={{
+                backgroundColor: dark ? 'rgba(99,102,241,0.25)' : 'rgba(99,102,241,0.12)',
+                color: dark ? '#a5b4fc' : '#6366f1',
+              }}
             >
               적용
             </button>
           </div>
-          <div className="max-h-44 overflow-y-auto">
+          <div className="max-h-44 overflow-y-auto py-0.5">
             {FONT_SIZES.map((s) => (
               <button
                 key={s}
                 onMouseDown={(e) => { e.preventDefault(); apply(s) }}
-                className={`flex items-center justify-between w-full px-3 py-1 text-xs transition-colors
-                  ${s === current
-                    ? dark ? 'bg-white/15 text-white' : 'bg-black/10'
-                    : dark ? 'text-white/70 hover:bg-white/10' : 'hover:bg-black/5'
-                  }`}
+                className="flex items-center justify-between w-full px-3 py-1 text-xs transition-colors"
+                style={{
+                  backgroundColor: s === current
+                    ? (dark ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.1)')
+                    : 'transparent',
+                  color: s === current
+                    ? (dark ? '#a5b4fc' : '#6366f1')
+                    : (dark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.6)'),
+                }}
               >
                 <span>{s}px</span>
-                {s === current && <span className={dark ? 'text-white/50' : 'text-black/40'}>✓</span>}
+                {s === current && (
+                  <span style={{ color: dark ? 'rgba(165,180,252,0.6)' : '#6366f1', fontSize: 10 }}>✓</span>
+                )}
               </button>
             ))}
           </div>
@@ -160,27 +216,48 @@ function FontFamilyPicker({ editor, dark }: { editor: Editor; dark?: boolean }):
       <button
         onMouseDown={(e) => { e.preventDefault(); setOpen((v) => !v) }}
         title="글자 폰트"
-        className={`h-6 px-1.5 rounded text-xs font-medium transition-colors min-w-[36px]
-          ${dark ? 'text-white/50 hover:bg-white/10 hover:text-white/80' : 'hover:bg-black/10'}`}
+        className="h-6 px-1.5 rounded-md text-xs font-medium transition-colors min-w-[36px]"
+        style={{
+          color: dark ? 'rgba(255,255,255,0.48)' : 'rgba(0,0,0,0.42)',
+          backgroundColor: open ? (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)') : 'transparent',
+        }}
       >
         {currentLabel}
       </button>
       {open && (
-        <div className={`absolute bottom-full left-0 mb-1 rounded-lg shadow-xl border z-50 overflow-hidden
-          ${dark ? 'bg-[#1a1a2e] border-white/10' : 'bg-white border-black/10'}`}
+        <div
+          className="absolute bottom-full left-0 mb-1.5 rounded-xl shadow-2xl border z-50 overflow-hidden py-0.5"
+          style={{
+            backgroundColor: dark ? '#1e1e2e' : '#ffffff',
+            borderColor: dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)',
+          }}
         >
           {FONTS.map((f) => (
             <button
               key={f.label}
               onMouseDown={(e) => { e.preventDefault(); apply(f.value) }}
               style={{ fontFamily: f.value || undefined }}
-              className={`block w-full text-left px-3 py-1 text-xs transition-colors whitespace-nowrap
-                ${f.value === current
-                  ? dark ? 'bg-white/15 text-white' : 'bg-black/10'
-                  : dark ? 'text-white/70 hover:bg-white/10' : 'hover:bg-black/5'
-                }`}
+              className="block w-full text-left px-3 py-1.5 text-xs transition-colors whitespace-nowrap"
+              onMouseEnter={(e) => {
+                if (f.value !== current) {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = dark
+                    ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (f.value !== current) {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'
+                }
+              }}
             >
-              {f.label}
+              <span style={{
+                fontFamily: f.value || undefined,
+                color: f.value === current
+                  ? (dark ? '#a5b4fc' : '#6366f1')
+                  : (dark ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.65)'),
+              }}>
+                {f.label}
+              </span>
             </button>
           ))}
         </div>
@@ -191,23 +268,15 @@ function FontFamilyPicker({ editor, dark }: { editor: Editor; dark?: boolean }):
 
 // ── 색상 팔레트 (10열 × 7행) ───────────────────────────────────
 const COLOR_PALETTE = [
-  // 흑/회/백
   ['#000000','#434343','#666666','#999999','#b7b7b7','#cccccc','#d9d9d9','#efefef','#f3f3f3','#ffffff'],
-  // 빨강
   ['#99000d','#cc0000','#e06666','#ea9999','#f4cccc','#ff0000','#ff4040','#ff8080','#ffb3b3','#ffd2d2'],
-  // 주황
   ['#783f04','#b45f06','#e69138','#f9cb9c','#fce5cd','#ff6600','#ff8c00','#ffb347','#ffd580','#fff0cc'],
-  // 노랑
   ['#7f6000','#bf9000','#f1c232','#ffe599','#fff2cc','#e6b800','#f9d900','#ffee55','#fff099','#fffacc'],
-  // 초록
   ['#274e13','#38761d','#6aa84f','#93c47d','#d9ead3','#007700','#33aa33','#55cc55','#99dd99','#cceecc'],
-  // 파랑
   ['#073763','#1155cc','#4a86e8','#9fc5e8','#cfe2f3','#0066cc','#0088ff','#44aaff','#88ccff','#cce8ff'],
-  // 보라
   ['#20124d','#674ea7','#9b59b6','#c39bd3','#e8daef','#7700cc','#9933ff','#bb55ff','#ddaaff','#f0d9ff'],
 ]
 
-// 체크마크를 어두운 색으로 표시해야 하는 밝은 색상들
 const LIGHT_COLORS = new Set([
   '#ffffff','#f3f3f3','#efefef','#d9d9d9','#cccccc','#b7b7b7',
   '#f4cccc','#ffd2d2','#ffb3b3','#ff8080',
@@ -228,17 +297,23 @@ interface ColorPopupProps {
 function ColorPopup({ currentColor, onSelect, dark, resetLabel = '재설정' }: ColorPopupProps): JSX.Element {
   return (
     <div
-      className={`absolute bottom-full right-0 mb-2 p-3 rounded-2xl shadow-2xl border z-50
-        ${dark ? 'bg-[#1e1e30] border-white/15' : 'bg-white border-black/10'}`}
+      className="absolute bottom-full right-0 mb-2 p-3 rounded-2xl shadow-2xl border z-50"
+      style={{
+        backgroundColor: dark ? '#1e1e2e' : '#ffffff',
+        borderColor: dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.09)',
+      }}
     >
-      {/* 재설정 */}
       <button
         onMouseDown={(e) => { e.preventDefault(); onSelect('') }}
-        className={`flex items-center gap-2 w-full px-2 py-1.5 mb-2 rounded-lg text-xs font-medium transition-colors
-          ${dark
-            ? 'text-white/55 hover:bg-white/10 hover:text-white/90'
-            : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'
-          }`}
+        className="flex items-center gap-2 w-full px-2 py-1.5 mb-2 rounded-lg text-xs font-medium transition-colors"
+        style={{ color: dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.backgroundColor = dark
+            ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)'
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'
+        }}
       >
         <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
           <path d="M1.5 1.5l8 8M9.5 1.5l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
@@ -246,7 +321,6 @@ function ColorPopup({ currentColor, onSelect, dark, resetLabel = '재설정' }: 
         {resetLabel}
       </button>
 
-      {/* 색상 그리드 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 22px)', gap: '4px' }}>
         {COLOR_PALETTE.flat().map((color) => (
           <button
@@ -254,11 +328,9 @@ function ColorPopup({ currentColor, onSelect, dark, resetLabel = '재설정' }: 
             onMouseDown={(e) => { e.preventDefault(); onSelect(color) }}
             title={color}
             style={{ backgroundColor: color, width: 22, height: 22 }}
-            className={`rounded-full relative flex items-center justify-center
-              transition-transform hover:scale-125 hover:z-10
+            className={`rounded-full relative flex items-center justify-center transition-transform hover:scale-125 hover:z-10
               ${(color === '#ffffff' || color === '#f3f3f3' || color === '#efefef')
-                ? 'ring-1 ring-inset ring-black/15'
-                : ''
+                ? 'ring-1 ring-inset ring-black/15' : ''
               }`}
           >
             {currentColor.toLowerCase() === color.toLowerCase() && (
@@ -299,28 +371,43 @@ function TextColorPicker({ editor, dark }: { editor: Editor; dark?: boolean }): 
     setOpen(false)
   }
 
-  const barColor = currentColor || (dark ? 'rgba(255,255,255,0.4)' : '#374151')
+  const barColor = currentColor || (dark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.5)')
 
   return (
     <div ref={ref} className="relative">
       <button
         onMouseDown={(e) => { e.preventDefault(); setOpen((v) => !v) }}
         title="글자색"
-        className={`w-7 h-8 flex flex-col items-center justify-center rounded transition-colors
-          ${dark
-            ? open ? 'bg-white/20' : 'hover:bg-white/10'
-            : open ? 'bg-black/15' : 'hover:bg-black/10'
-          }`}
+        className="w-7 h-7 flex flex-col items-center justify-center rounded-md transition-colors"
+        style={{
+          backgroundColor: open
+            ? (dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.07)')
+            : 'transparent',
+        }}
+        onMouseEnter={(e) => {
+          if (!open) {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = dark
+              ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)'
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!open) {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'
+          }
+        }}
       >
         <span
-          className={`font-black leading-none select-none ${dark ? 'text-white/85' : 'text-gray-800'}`}
-          style={{ fontSize: 15, fontFamily: 'Georgia, serif', lineHeight: 1 }}
-        >
-          A
-        </span>
+          className="font-black leading-none select-none"
+          style={{
+            fontSize: 14,
+            fontFamily: 'Georgia, serif',
+            lineHeight: 1,
+            color: dark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.65)',
+          }}
+        >A</span>
         <span
           className="rounded-sm"
-          style={{ width: 14, height: 3, backgroundColor: barColor, marginTop: 1 }}
+          style={{ width: 13, height: 2.5, backgroundColor: barColor, marginTop: 2 }}
         />
       </button>
       {open && (
@@ -350,39 +437,53 @@ function HighlightPicker({ editor, dark }: { editor: Editor; dark?: boolean }): 
     setOpen(false)
   }
 
-  const swatchColor = currentColor || (dark ? 'rgba(255,255,255,0.4)' : '#374151')
+  const swatchColor = currentColor || (dark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)')
 
   return (
     <div ref={ref} className="relative">
       <button
         onMouseDown={(e) => { e.preventDefault(); setOpen((v) => !v) }}
         title="글자 배경색"
-        className={`w-8 h-8 flex flex-col items-center justify-center rounded transition-colors
-          ${dark
-            ? open ? 'bg-white/20' : 'hover:bg-white/10'
-            : open ? 'bg-black/15' : 'hover:bg-black/10'
-          }`}
+        className="w-7 h-7 flex flex-col items-center justify-center rounded-md transition-colors"
+        style={{
+          backgroundColor: open
+            ? (dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.07)')
+            : 'transparent',
+        }}
+        onMouseEnter={(e) => {
+          if (!open) {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = dark
+              ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)'
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!open) {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'
+          }
+        }}
       >
-        {/* 하이라이터 마커 아이콘: 사각 박스 안 A */}
         <div
           className="relative flex items-center justify-center rounded-sm"
           style={{
-            width: 20,
-            height: 20,
-            backgroundColor: currentColor || (dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'),
-            border: `1px solid ${dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.25)'}`,
+            width: 18,
+            height: 18,
+            backgroundColor: currentColor || (dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.07)'),
+            border: `1px solid ${dark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.2)'}`,
           }}
         >
           <span
-            className={`font-black leading-none select-none ${dark ? 'text-white/85' : 'text-gray-800'}`}
-            style={{ fontSize: 13, fontFamily: 'Georgia, serif', lineHeight: 1 }}
-          >
-            A
-          </span>
+            className="font-black leading-none select-none"
+            style={{
+              fontSize: 12,
+              fontFamily: 'Georgia, serif',
+              lineHeight: 1,
+              color: dark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.65)',
+            }}
+          >A</span>
         </div>
         <span
           className="rounded-sm"
-          style={{ width: 16, height: 3, backgroundColor: swatchColor, marginTop: 1 }}
+          style={{ width: 13, height: 2.5, backgroundColor: swatchColor, marginTop: 2 }}
         />
       </button>
       {open && (
@@ -396,81 +497,113 @@ function HighlightPicker({ editor, dark }: { editor: Editor; dark?: boolean }): 
 export function Toolbar({ editor, dark }: Props): JSX.Element | null {
   if (!editor) return null
 
-  const divider = <div className={`w-px h-4 mx-0.5 ${dark ? 'bg-white/10' : 'bg-black/15'}`} />
-
   return (
-    <div className="flex items-center gap-0.5 px-2 py-1.5 flex-wrap">
-      <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="굵게 (⌘B)">
-        <strong>B</strong>
-      </ToolButton>
-      <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="기울임 (⌘I)">
-        <em>I</em>
-      </ToolButton>
-      <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} title="밑줄 (⌘U)">
-        <span className="underline">U</span>
-      </ToolButton>
-      <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="취소선">
-        <span className="line-through">S</span>
-      </ToolButton>
+    <div
+      className="flex items-center gap-1 px-2.5 py-2 flex-wrap"
+      style={{ borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}` }}
+    >
+      {/* 서식 그룹 */}
+      <ToolGroup dark={dark}>
+        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="굵게 (⌘B)">
+          <strong style={{ fontWeight: 700 }}>B</strong>
+        </ToolButton>
+        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="기울임 (⌘I)">
+          <em>I</em>
+        </ToolButton>
+        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} title="밑줄 (⌘U)">
+          <span className="underline">U</span>
+        </ToolButton>
+        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="취소선">
+          <span className="line-through">S</span>
+        </ToolButton>
+      </ToolGroup>
 
-      {divider}
+      {/* 헤딩 그룹 */}
+      <ToolGroup dark={dark}>
+        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} title="제목 1">
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '-0.02em' }}>H1</span>
+        </ToolButton>
+        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="제목 2">
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '-0.02em' }}>H2</span>
+        </ToolButton>
+      </ToolGroup>
 
-      <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} title="제목 1">
-        H1
-      </ToolButton>
-      <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="제목 2">
-        H2
-      </ToolButton>
+      {/* 목록 그룹 */}
+      <ToolGroup dark={dark}>
+        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="불릿 목록">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <circle cx="2" cy="4" r="1.2" fill="currentColor"/>
+            <circle cx="2" cy="7" r="1.2" fill="currentColor"/>
+            <circle cx="2" cy="10" r="1.2" fill="currentColor"/>
+            <rect x="4.5" y="3.3" width="6.5" height="1.4" rx="0.7" fill="currentColor" opacity="0.7"/>
+            <rect x="4.5" y="6.3" width="6.5" height="1.4" rx="0.7" fill="currentColor" opacity="0.7"/>
+            <rect x="4.5" y="9.3" width="4.5" height="1.4" rx="0.7" fill="currentColor" opacity="0.7"/>
+          </svg>
+        </ToolButton>
+        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="번호 목록">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <text x="0.5" y="5.5" style={{ fontSize: '5px', fontWeight: 700 }} fill="currentColor">1.</text>
+            <text x="0.5" y="8.5" style={{ fontSize: '5px', fontWeight: 700 }} fill="currentColor">2.</text>
+            <text x="0.5" y="11.5" style={{ fontSize: '5px', fontWeight: 700 }} fill="currentColor">3.</text>
+            <rect x="5" y="3.3" width="6" height="1.3" rx="0.65" fill="currentColor" opacity="0.7"/>
+            <rect x="5" y="6.3" width="6" height="1.3" rx="0.65" fill="currentColor" opacity="0.7"/>
+            <rect x="5" y="9.3" width="4" height="1.3" rx="0.65" fill="currentColor" opacity="0.7"/>
+          </svg>
+        </ToolButton>
+        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} title="체크리스트">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <rect x="0.8" y="2.8" width="3.4" height="3.4" rx="0.8" stroke="currentColor" strokeWidth="1.2"/>
+            <path d="M1.6 4.6l0.9 0.9 1.5-1.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+            <rect x="0.8" y="7.8" width="3.4" height="3.4" rx="0.8" stroke="currentColor" strokeWidth="1.2" opacity="0.5"/>
+            <rect x="5.5" y="4" width="6" height="1.3" rx="0.65" fill="currentColor" opacity="0.7"/>
+            <rect x="5.5" y="9" width="4.5" height="1.3" rx="0.65" fill="currentColor" opacity="0.5"/>
+          </svg>
+        </ToolButton>
+      </ToolGroup>
 
-      {divider}
+      {/* 블록 그룹 */}
+      <ToolGroup dark={dark}>
+        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="인용문">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <rect x="1" y="2" width="2" height="9" rx="1" fill="currentColor" opacity="0.8"/>
+            <rect x="5" y="2" width="2" height="9" rx="1" fill="currentColor" opacity="0.5"/>
+            <rect x="8" y="4" width="4" height="1.5" rx="0.75" fill="currentColor" opacity="0.6"/>
+            <rect x="8" y="7" width="3" height="1.5" rx="0.75" fill="currentColor" opacity="0.6"/>
+          </svg>
+        </ToolButton>
+        <ToolButton dark={dark} onClick={() => editor.chain().focus().setHorizontalRule().run()} active={false} title="구분선">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <rect x="1" y="6" width="11" height="1.5" rx="0.75" fill="currentColor" opacity="0.7"/>
+          </svg>
+        </ToolButton>
+        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} title="코드 블록">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M4 3L1 6.5L4 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M9 3L12 6.5L9 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </ToolButton>
+        <ToolButton dark={dark} onClick={() => editor.chain().focus().setDetails().run()} active={editor.isActive('details')} title="토글 블록">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M3 4.5L6.5 8L10 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <rect x="1" y="9.5" width="11" height="1" rx="0.5" fill="currentColor" opacity="0.4"/>
+          </svg>
+        </ToolButton>
+        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleCallout().run()} active={editor.isActive('callout')} title="콜아웃">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <rect x="1" y="2.5" width="11" height="8" rx="2" stroke="currentColor" strokeWidth="1.2" opacity="0.8"/>
+            <path d="M6.5 5.5v3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            <circle cx="6.5" cy="4" r="0.8" fill="currentColor"/>
+          </svg>
+        </ToolButton>
+      </ToolGroup>
 
-      <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="불릿 목록">
-        •≡
-      </ToolButton>
-      <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="번호 목록">
-        1≡
-      </ToolButton>
-      <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} title="체크리스트">
-        ☑
-      </ToolButton>
-
-      {divider}
-
-      <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="인용문">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-          <rect x="1" y="2" width="2" height="9" rx="1" fill="currentColor" opacity="0.8"/>
-          <rect x="5" y="2" width="2" height="9" rx="1" fill="currentColor" opacity="0.5"/>
-          <rect x="8" y="4" width="4" height="1.5" rx="0.75" fill="currentColor" opacity="0.6"/>
-          <rect x="8" y="7" width="3" height="1.5" rx="0.75" fill="currentColor" opacity="0.6"/>
-        </svg>
-      </ToolButton>
-      <ToolButton dark={dark} onClick={() => editor.chain().focus().setHorizontalRule().run()} active={false} title="구분선">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-          <rect x="1" y="6" width="11" height="1.5" rx="0.75" fill="currentColor" opacity="0.7"/>
-        </svg>
-      </ToolButton>
-      <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} title="코드 블록">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-          <path d="M4 3L1 6.5L4 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          <path d="M9 3L12 6.5L9 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </ToolButton>
-      <ToolButton dark={dark} onClick={() => editor.chain().focus().setDetails().run()} active={editor.isActive('details')} title="토글 블록">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-          <path d="M3 4.5L6.5 8L10 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          <rect x="1" y="9.5" width="11" height="1" rx="0.5" fill="currentColor" opacity="0.4"/>
-        </svg>
-      </ToolButton>
-      <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleCallout().run()} active={editor.isActive('callout')} title="콜아웃">
-        💡
-      </ToolButton>
-
-      {divider}
-
-      <FontSizePicker editor={editor} dark={dark} />
-      <FontFamilyPicker editor={editor} dark={dark} />
-      <TextColorPicker editor={editor} dark={dark} />
-      <HighlightPicker editor={editor} dark={dark} />
+      {/* 텍스트 스타일 그룹 */}
+      <div className="flex items-center gap-0.5 ml-auto">
+        <FontSizePicker editor={editor} dark={dark} />
+        <FontFamilyPicker editor={editor} dark={dark} />
+        <TextColorPicker editor={editor} dark={dark} />
+        <HighlightPicker editor={editor} dark={dark} />
+      </div>
     </div>
   )
 }

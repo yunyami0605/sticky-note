@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import { useSettingsStore, isMac } from '../../store/settingsStore'
+import { useSettingsStore } from '../../store/settingsStore'
 import { useNoteStore } from '../../store/noteStore'
-import type { ThemeMode, ThemeColor, StartBehavior, KeyShortcut, ShortcutSettings } from '../../../../shared/types'
+import type { ThemeMode, ThemeColor, StartBehavior } from '../../../../shared/types'
+import { ShortcutsModal } from '../ShortcutsModal'
 
 interface Props {
   onClose: () => void
@@ -130,124 +131,12 @@ const LIGHT_COLORS: { value: ThemeColor; label: string; bg: string }[] = [
   { value: 'slate',    label: '슬레이트',  bg: '#f8f8f8' },
 ]
 
-function formatShortcut(sc: KeyShortcut): string {
-  const parts: string[] = []
-  if (sc.meta) parts.push(isMac ? '⌘' : 'Win')
-  if (sc.ctrl) parts.push('Ctrl')
-  if (sc.shift) parts.push(isMac ? '⇧' : 'Shift')
-  if (sc.alt) parts.push(isMac ? '⌥' : 'Alt')
-  parts.push(sc.key === ',' ? ',' : sc.key === '\\' ? '\\' : sc.key.toUpperCase())
-  return parts.join(isMac ? '' : '+')
-}
-
-const DEFAULT_SHORTCUT_LABELS: Record<keyof ShortcutSettings, string> = {
-  newNote: '새 메모',
-  searchFocus: '검색 포커스',
-  openSettings: '설정 열기',
-  toggleSidebar: '사이드바 토글',
-}
-
-function ShortcutsSection({ isDark }: { isDark: boolean }): JSX.Element {
-  const { shortcuts, update } = useSettingsStore()
-  const [capturing, setCapturing] = useState<keyof ShortcutSettings | null>(null)
-  const captureRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!capturing) return
-    const handler = (e: KeyboardEvent): void => {
-      e.preventDefault()
-      if (e.key === 'Escape') { setCapturing(null); return }
-      if (['Meta', 'Control', 'Shift', 'Alt'].includes(e.key)) return
-      const sc: KeyShortcut = {
-        key: e.key.toLowerCase(),
-        meta: e.metaKey,
-        ctrl: e.ctrlKey,
-        shift: e.shiftKey,
-        alt: e.altKey,
-      }
-      update({ shortcuts: { ...shortcuts, [capturing]: sc } })
-      setCapturing(null)
-    }
-    document.addEventListener('keydown', handler, { capture: true })
-    return () => document.removeEventListener('keydown', handler, { capture: true })
-  }, [capturing, shortcuts, update])
-
-  const handleReset = (): void => {
-    const def = isMac
-      ? {
-          newNote:       { key: 'n',  meta: true,  ctrl: false, shift: false, alt: false },
-          searchFocus:   { key: 'f',  meta: true,  ctrl: false, shift: false, alt: false },
-          openSettings:  { key: ',',  meta: true,  ctrl: false, shift: false, alt: false },
-          toggleSidebar: { key: '\\', meta: true,  ctrl: false, shift: false, alt: false },
-        }
-      : {
-          newNote:       { key: 'n',  meta: false, ctrl: true,  shift: false, alt: false },
-          searchFocus:   { key: 'f',  meta: false, ctrl: true,  shift: false, alt: false },
-          openSettings:  { key: ',',  meta: false, ctrl: true,  shift: false, alt: false },
-          toggleSidebar: { key: '\\', meta: false, ctrl: true,  shift: false, alt: false },
-        }
-    update({ shortcuts: def })
-  }
-
-  const shortcutKeys = Object.keys(DEFAULT_SHORTCUT_LABELS) as (keyof ShortcutSettings)[]
-
-  return (
-    <section>
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--app-text-muted)' }}>
-          단축키
-        </p>
-        <button
-          onClick={handleReset}
-          className="text-[10px] transition-opacity hover:opacity-80"
-          style={{ color: 'var(--app-text-dim)' }}
-        >
-          기본값 복원
-        </button>
-      </div>
-      <div ref={captureRef} className="flex flex-col gap-1">
-        {shortcutKeys.map((name) => {
-          const isCapturing = capturing === name
-          return (
-            <div
-              key={name}
-              className="flex items-center justify-between px-3 py-1.5 rounded-lg"
-              style={{ backgroundColor: 'var(--app-hover)', border: `1px solid ${isCapturing ? 'var(--app-text-muted)' : 'var(--app-border)'}` }}
-            >
-              <span className="text-xs" style={{ color: 'var(--app-text)' }}>
-                {DEFAULT_SHORTCUT_LABELS[name]}
-              </span>
-              <button
-                onClick={() => setCapturing(isCapturing ? null : name)}
-                className="text-[11px] px-2 py-0.5 rounded font-mono transition-colors"
-                style={{
-                  backgroundColor: isCapturing
-                    ? (isDark ? 'rgba(99,102,241,0.3)' : 'rgba(99,102,241,0.15)')
-                    : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.07)'),
-                  color: isCapturing ? '#818cf8' : 'var(--app-text)',
-                  minWidth: 60,
-                  textAlign: 'center',
-                }}
-              >
-                {isCapturing ? '키 입력...' : formatShortcut(shortcuts[name])}
-              </button>
-            </div>
-          )
-        })}
-      </div>
-      {capturing && (
-        <p className="text-[10px] mt-1.5 text-center" style={{ color: 'var(--app-text-dim)' }}>
-          변경할 단축키를 입력하세요. ESC로 취소.
-        </p>
-      )}
-    </section>
-  )
-}
 
 export function SettingsPanel({ onClose }: Props): JSX.Element {
-  const { themeMode, themeColor, startBehavior, spellCheck, update } = useSettingsStore()
+  const { themeMode, themeColor, startBehavior, spellCheck, editorFontSize, editorTextColor, update } = useSettingsStore()
   const { notes, selectedId } = useNoteStore()
   const [exportStatus, setExportStatus] = useState<string | null>(null)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const isDark = themeMode === 'dark'
 
   const colors = isDark ? DARK_COLORS : LIGHT_COLORS
@@ -295,6 +184,7 @@ export function SettingsPanel({ onClose }: Props): JSX.Element {
   }
 
   return (
+    <>
     <div
       className="absolute inset-0 z-50 flex items-start justify-end"
       style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
@@ -402,6 +292,96 @@ export function SettingsPanel({ onClose }: Props): JSX.Element {
             <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--app-text-muted)' }}>
               편집기
             </p>
+            {/* 기본 글자 크기 */}
+            <div
+              className="flex items-center justify-between px-3 py-2 rounded-lg mb-2"
+              style={{ backgroundColor: 'var(--app-hover)', border: '1px solid var(--app-border)' }}
+            >
+              <div>
+                <p className="text-xs font-medium" style={{ color: 'var(--app-text)' }}>기본 글자 크기</p>
+                <p className="text-[11px]" style={{ color: 'var(--app-text-dim)' }}>메인 에디터 기본 크기</p>
+              </div>
+              <div className="flex items-center gap-1">
+                {[12, 13, 14, 15, 16, 18].map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => update({ editorFontSize: size })}
+                    className="w-7 h-7 flex items-center justify-center rounded-md text-[11px] font-medium transition-colors"
+                    style={{
+                      backgroundColor: editorFontSize === size
+                        ? (isDark ? 'rgba(99,102,241,0.35)' : 'rgba(99,102,241,0.18)')
+                        : 'transparent',
+                      color: editorFontSize === size ? '#818cf8' : 'var(--app-text-muted)',
+                      border: editorFontSize === size ? '1px solid rgba(99,102,241,0.4)' : '1px solid transparent',
+                    }}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 기본 글자 색상 */}
+            <div
+              className="flex items-center justify-between px-3 py-2 rounded-lg mb-2"
+              style={{ backgroundColor: 'var(--app-hover)', border: '1px solid var(--app-border)' }}
+            >
+              <div>
+                <p className="text-xs font-medium" style={{ color: 'var(--app-text)' }}>기본 글자 색상</p>
+                <p className="text-[11px]" style={{ color: 'var(--app-text-dim)' }}>스타일 없는 텍스트 색상</p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {/* 테마 기본값 */}
+                <button
+                  onClick={() => update({ editorTextColor: '' })}
+                  className="w-6 h-6 rounded-md flex items-center justify-center transition-colors text-[9px] font-bold"
+                  title="테마 기본색"
+                  style={{
+                    backgroundColor: editorTextColor === '' ? (isDark ? 'rgba(99,102,241,0.3)' : 'rgba(99,102,241,0.15)') : 'var(--app-active)',
+                    color: 'var(--app-text)',
+                    border: editorTextColor === '' ? '1.5px solid #6366f1' : '1px solid var(--app-border)',
+                  }}
+                >
+                  A
+                </button>
+                {/* 프리셋 색상 */}
+                {(isDark
+                  ? ['#ffffff', '#e2e8f0', '#94a3b8', '#60a5fa', '#34d399', '#fbbf24', '#f87171', '#c084fc']
+                  : ['#111827', '#374151', '#6b7280', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+                ).map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => update({ editorTextColor: color })}
+                    className="w-5 h-5 rounded-full transition-transform hover:scale-110 flex-shrink-0"
+                    title={color}
+                    style={{
+                      backgroundColor: color,
+                      outline: editorTextColor === color ? `2px solid ${color}` : 'none',
+                      outlineOffset: 2,
+                      border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}`,
+                    }}
+                  />
+                ))}
+                {/* 커스텀 색상 */}
+                <label
+                  className="w-5 h-5 rounded-full flex items-center justify-center cursor-pointer transition-colors flex-shrink-0"
+                  title="커스텀 색상"
+                  style={{
+                    background: 'conic-gradient(red, yellow, lime, cyan, blue, magenta, red)',
+                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'}`,
+                  }}
+                >
+                  <input
+                    type="color"
+                    className="sr-only"
+                    value={editorTextColor || (isDark ? '#ffffff' : '#111827')}
+                    onChange={(e) => update({ editorTextColor: e.target.value })}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* 맞춤법 검사 */}
             <button
               onClick={() => update({ spellCheck: !spellCheck })}
               className="flex items-center justify-between w-full px-3 py-2 rounded-lg transition-colors"
@@ -428,7 +408,22 @@ export function SettingsPanel({ onClose }: Props): JSX.Element {
           </section>
 
           {/* 단축키 */}
-          <ShortcutsSection isDark={isDark} />
+          <section>
+            <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--app-text-muted)' }}>
+              단축키
+            </p>
+            <button
+              onClick={() => setShowShortcuts(true)}
+              className="w-full py-2 rounded-lg text-xs font-medium transition-colors"
+              style={{
+                backgroundColor: 'var(--app-hover)',
+                color: 'var(--app-text)',
+                border: '1px solid var(--app-border)',
+              }}
+            >
+              단축키 설정 열기
+            </button>
+          </section>
 
           {/* 내보내기 */}
           <section>
@@ -495,5 +490,10 @@ export function SettingsPanel({ onClose }: Props): JSX.Element {
         </div>
       </div>
     </div>
+
+    {showShortcuts && (
+      <ShortcutsModal isDark={isDark} onClose={() => setShowShortcuts(false)} />
+    )}
+  </>
   )
 }

@@ -193,24 +193,30 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
       <Toolbar editor={editor} />
 
       {/* footer: font size + opacity */}
-      <div className="flex items-center gap-2 px-2 py-1 border-t border-black/10">
+      <div className="flex items-center gap-3 px-3 py-1.5 border-t border-black/10">
         <button
           onClick={cycleFontSize}
-          className="text-[10px] opacity-50 hover:opacity-80 transition-opacity"
+          className="flex items-center gap-1 text-[10px] font-medium transition-opacity hover:opacity-100 flex-shrink-0"
+          style={{ opacity: 0.45 }}
           title="글자 크기 변경"
         >
-          A{note.fontSize === 'lg' ? '↓' : '↑'}
+          <span style={{ fontSize: 11, fontWeight: 700 }}>A</span>
+          <span style={{ fontSize: 9 }}>{note.fontSize === 'sm' ? 'S' : note.fontSize === 'md' ? 'M' : 'L'}</span>
         </button>
-        <input
-          type="range"
-          min="0.3"
-          max="1"
-          step="0.05"
-          value={note.opacity}
-          onChange={handleOpacityChange}
-          className="flex-1 h-1 accent-current opacity-40 hover:opacity-70"
-          title="투명도"
-        />
+        <div className="flex items-center gap-1.5 flex-1" style={{ opacity: 0.4 }} title="투명도">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2" strokeDasharray="2 1.5"/>
+          </svg>
+          <input
+            type="range"
+            min="0.3"
+            max="1"
+            step="0.05"
+            value={note.opacity}
+            onChange={handleOpacityChange}
+            className="flex-1 h-0.5 accent-current"
+          />
+        </div>
       </div>
     </div>
   )

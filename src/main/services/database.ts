@@ -12,10 +12,16 @@ import type {
 function defaultShortcuts(platform: string): ShortcutSettings {
   const isMac = platform === 'darwin'
   return {
-    newNote:       { key: 'n',  meta: isMac,  ctrl: !isMac, shift: false, alt: false },
-    searchFocus:   { key: 'f',  meta: isMac,  ctrl: !isMac, shift: false, alt: false },
-    openSettings:  { key: ',',  meta: isMac,  ctrl: !isMac, shift: false, alt: false },
-    toggleSidebar: { key: '\\', meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    newNote:       { key: 'n',         meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    searchFocus:   { key: 'f',         meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    openSettings:  { key: ',',         meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    toggleSidebar: { key: '\\',        meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    deleteNote:    { key: 'backspace',  meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    duplicateNote: { key: 'd',         meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    openWindow:    { key: 'enter',     meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    prevNote:      { key: 'arrowup',   meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    nextNote:      { key: 'arrowdown', meta: isMac,  ctrl: !isMac, shift: false, alt: false },
+    toggleTheme:   { key: 'l',         meta: isMac,  ctrl: !isMac, shift: true,  alt: false },
   }
 }
 
@@ -356,6 +362,8 @@ export function getSettings(): AppSettings {
     themeColor: (map['themeColor'] ?? 'navy') as ThemeColor,
     startBehavior: (map['startBehavior'] ?? 'main') as StartBehavior,
     spellCheck: map['spellCheck'] === 'true',
+    editorFontSize: map['editorFontSize'] ? parseInt(map['editorFontSize']) : 14,
+    editorTextColor: map['editorTextColor'] ?? '',
     shortcuts,
   }
 }
