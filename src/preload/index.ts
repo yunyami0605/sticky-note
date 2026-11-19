@@ -57,6 +57,10 @@ const api = {
   settings: {
     get: (): Promise<AppSettings> => ipcRenderer.invoke(IPC.SETTINGS_GET),
     update: (partial: Partial<AppSettings>): Promise<AppSettings> => ipcRenderer.invoke(IPC.SETTINGS_UPDATE, partial),
+    onUpdated: (cb: (settings: AppSettings) => void) => {
+      ipcRenderer.on(IPC.SETTINGS_UPDATED, (_e, settings) => cb(settings))
+      return () => ipcRenderer.removeAllListeners(IPC.SETTINGS_UPDATED)
+    },
   },
   folder: {
     getAll: (): Promise<Folder[]> => ipcRenderer.invoke(IPC.FOLDER_GET_ALL),

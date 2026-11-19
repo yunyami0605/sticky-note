@@ -277,7 +277,12 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.SETTINGS_GET, () => getSettings())
 
   ipcMain.handle(IPC.SETTINGS_UPDATE, (_e, partial: Partial<AppSettings>) => {
-    return updateSettings(partial)
+    const updated = updateSettings(partial)
+    // 모든 플로팅 창에 설정 변경 브로드캐스트
+    for (const [, win] of noteWindows) {
+      if (!win.isDestroyed()) win.webContents.send(IPC.SETTINGS_UPDATED, updated)
+    }
+    return updated
   })
 
   // ── Markdown 가져오기 ─────────────────────────────────────

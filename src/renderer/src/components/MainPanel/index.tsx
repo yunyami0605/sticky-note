@@ -21,6 +21,7 @@ import { Callout } from '../../extensions/Callout'
 import { SlashCommand } from '../../extensions/SlashCommand'
 import { Mention, MentionNode } from '../../extensions/Mention'
 import { DragHandle } from '../../extensions/DragHandle'
+import { SelectionToolbar } from '../SelectionToolbar'
 import type { Note, SortBy } from '../../../../shared/types'
 
 const lowlight = createLowlight(common)
@@ -94,6 +95,7 @@ function InlineEditor({ isDark }: { isDark: boolean }): JSX.Element | null {
         className={`${isDark ? 'dark-editor' : ''} flex-1 overflow-y-auto pl-10 pr-6 py-4`}
         style={{ color: editorTextColor || 'var(--app-text)', fontSize: editorFontSize }}
       >
+        {editor && <SelectionToolbar editor={editor} dark={isDark} />}
         <EditorContent editor={editor} className="tiptap h-full" spellCheck={spellCheck} />
       </div>
       <div className="border-t flex-shrink-0" style={{ borderColor: 'var(--app-border)' }}>
@@ -526,11 +528,17 @@ function TreeSection({
 
   return (
     <div
-      style={{ marginLeft: depth * 10 }}
+      style={{ marginLeft: depth * 14, position: 'relative' }}
       onDragOver={handleBodyDragOver}
       onDragLeave={handleBodyDragLeave}
       onDrop={handleBodyDrop}
     >
+      {depth > 0 && (
+        <div style={{
+          position: 'absolute', left: -9, top: 0, bottom: 0, width: 1,
+          backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+        }} />
+      )}
       {/* 섹션 헤더 — folder drop indicator line above on reorder */}
       {headerFolderIndicator === 'reorder' && (
         <div className="h-0.5 pointer-events-none" style={{ backgroundColor: 'rgba(99,102,241,0.8)' }} />
@@ -555,7 +563,7 @@ function TreeSection({
         {renamingContent ?? (
           <button
             className="flex items-center gap-1.5 flex-1 py-1.5 text-xs text-left min-w-0"
-            style={{ paddingLeft: 8, color: 'var(--app-text-muted)' }}
+            style={{ paddingLeft: 8, color: isDark ? 'rgba(255,255,255,0.78)' : 'rgba(0,0,0,0.72)' }}
             onClick={onToggle}
             draggable={draggableFolder}
             onDragStart={draggableFolder ? onFolderDragStart : undefined}
@@ -576,14 +584,16 @@ function TreeSection({
           </button>
         )}
         <div
-          className="opacity-0 group-hover:opacity-100 flex items-center pr-1.5 gap-0.5 flex-shrink-0 transition-opacity"
+          className="flex items-center pr-1.5 gap-0.5 flex-shrink-0"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           {onCycleSort && (
             <button
               onClick={(e) => { e.stopPropagation(); onCycleSort() }}
-              className="w-5 h-5 flex items-center justify-center rounded hover:opacity-70"
-              style={{ color: 'var(--app-text-dim)' }}
+              className="w-5 h-5 flex items-center justify-center rounded transition-opacity"
+              style={{ color: 'var(--app-text-dim)', opacity: 0.45 }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1' }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.45' }}
               title={`정렬: ${sortBy ?? 'updatedAt'}`}
             >
               {sortBy === 'createdAt' ? (
@@ -620,23 +630,29 @@ function TreeSection({
           )}
           <button
             onClick={(e) => { e.stopPropagation(); onNewNote() }}
-            className="w-5 h-5 flex items-center justify-center rounded hover:opacity-70 text-sm leading-none"
-            style={{ color: 'var(--app-text-dim)' }}
+            className="w-5 h-5 flex items-center justify-center rounded text-sm leading-none transition-opacity"
+            style={{ color: 'var(--app-text-dim)', opacity: 0.45 }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1' }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.45' }}
             title="이 폴더에 메모 추가"
           >+</button>
           {onRename && (
             <button
               onClick={(e) => { e.stopPropagation(); onRename() }}
-              className="w-5 h-5 flex items-center justify-center rounded hover:opacity-70 text-[10px]"
-              style={{ color: 'var(--app-text-dim)' }}
+              className="w-5 h-5 flex items-center justify-center rounded text-[10px] transition-opacity"
+              style={{ color: 'var(--app-text-dim)', opacity: 0.45 }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1' }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.45' }}
               title="이름 변경"
             >✎</button>
           )}
           {onDelete && (
             <button
               onClick={(e) => { e.stopPropagation(); onDelete() }}
-              className="w-5 h-5 flex items-center justify-center rounded hover:opacity-70 text-[10px]"
-              style={{ color: 'var(--app-text-dim)' }}
+              className="w-5 h-5 flex items-center justify-center rounded text-[10px] transition-opacity"
+              style={{ color: 'var(--app-text-dim)', opacity: 0.45 }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1' }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.45' }}
               title="폴더 삭제"
             >×</button>
           )}

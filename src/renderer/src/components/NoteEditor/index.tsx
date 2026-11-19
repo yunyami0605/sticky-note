@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import TaskList from '@tiptap/extension-task-list'
@@ -18,6 +18,7 @@ import type { Note, UpdateNotePayload, NoteColor } from '../../../../shared/type
 import { useSettingsStore } from '../../store/settingsStore'
 import { Toolbar } from '../Toolbar'
 import { ColorPicker } from '../ColorPicker'
+import { SelectionToolbar } from '../SelectionToolbar'
 
 const lowlight = createLowlight(common)
 
@@ -28,9 +29,15 @@ interface Props {
 
 export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const { spellCheck, editorFontSize, editorTextColor, load: loadSettings } = useSettingsStore()
+  const { spellCheck, editorFontSize, editorTextColor, load: loadSettings, applyBroadcast } = useSettingsStore()
+  const [zoomInput, setZoomInput] = useState<string | null>(null)
 
-  useEffect(() => { loadSettings() }, [])
+  useEffect(() => {
+    loadSettings()
+    // 메인 창에서 설정이 변경되면 플로팅 창도 즉시 반영
+    const off = window.api.settings.onUpdated((s) => applyBroadcast(s))
+    return off
+  }, [])
 
   const persistUpdate = useCallback((payload: UpdateNotePayload): void => {
     // DB 저장 + 로컬 state 즉시 반영
@@ -207,6 +214,7 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
         className="flex-1 overflow-y-auto pl-8 pr-3 py-2"
         style={{ fontSize: Math.round(editorFontSize * note.fontSize / 100), color: editorTextColor || undefined }}
       >
+        {editor && <SelectionToolbar editor={editor} dark={false} />}
         <EditorContent editor={editor} className="tiptap h-full" spellCheck={spellCheck} />
       </div>
 
@@ -221,10 +229,33 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
             className="w-5 h-5 flex items-center justify-center rounded hover:opacity-70 text-xs font-bold"
             title="글자 배율 축소 (Cmd+-)"
           >−</button>
-          <span
-            className="text-[10px] font-medium tabular-nums min-w-[32px] text-center"
-            title="글자 배율 (Cmd+0으로 초기화)"
-          >{note.fontSize}%</span>
+          {zoomInput !== null ? (
+            <input
+              type="number"
+              className="text-[10px] font-medium tabular-nums text-center outline-none rounded"
+              style={{ width: 36, backgroundColor: 'rgba(0,0,0,0.08)' }}
+              value={zoomInput}
+              autoFocus
+              onChange={(e) => setZoomInput(e.target.value)}
+              onBlur={() => {
+                const v = parseInt(zoomInput)
+                const clamped = isNaN(v) ? note.fontSize : Math.min(200, Math.max(50, v))
+                persistUpdate({ fontSize: clamped })
+                onNoteChange({ ...note, fontSize: clamped })
+                setZoomInput(null)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                if (e.key === 'Escape') setZoomInput(null)
+              }}
+            />
+          ) : (
+            <span
+              className="text-[10px] font-medium tabular-nums min-w-[32px] text-center cursor-text"
+              title="클릭하여 직접 입력 (Cmd+0으로 초기화)"
+              onClick={() => setZoomInput(String(note.fontSize))}
+            >{note.fontSize}%</span>
+          )}
           <button
             onClick={() => handleZoomChange(10)}
             className="w-5 h-5 flex items-center justify-center rounded hover:opacity-70 text-xs font-bold"

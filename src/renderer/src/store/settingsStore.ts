@@ -29,6 +29,7 @@ interface SettingsStore {
   loaded: boolean
   load: () => Promise<void>
   update: (partial: Partial<AppSettings>) => Promise<void>
+  applyBroadcast: (settings: AppSettings) => void
 }
 
 export const useSettingsStore = create<SettingsStore>((set) => ({
@@ -51,6 +52,11 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     const updated = await window.api.settings.update(partial)
     set({ ...updated })
     applyTheme(updated.themeMode, updated.themeColor)
+  },
+
+  applyBroadcast: (settings: AppSettings) => {
+    set({ ...settings })
+    applyTheme(settings.themeMode, settings.themeColor)
   },
 }))
 

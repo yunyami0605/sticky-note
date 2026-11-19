@@ -504,7 +504,7 @@ export function Toolbar({ editor, dark }: Props): JSX.Element | null {
     if (!el) return
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setCollapsed(entry.contentRect.width < 300)
+        setCollapsed(entry.contentRect.width < 420)
       }
     })
     observer.observe(el)
@@ -607,7 +607,20 @@ export function Toolbar({ editor, dark }: Props): JSX.Element | null {
             <path d="M9 3L12 6.5L9 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </ToolButton>
-        <ToolButton dark={dark} onClick={() => editor.chain().focus().setDetails().run()} active={editor.isActive('details')} title="토글 블록">
+        <ToolButton dark={dark} onClick={() => {
+          if (editor.isActive('details')) {
+            editor.chain().focus().unsetDetails().run()
+          } else {
+            editor.chain().focus().insertContent({
+              type: 'details',
+              attrs: { open: true },
+              content: [
+                { type: 'detailsSummary', content: [{ type: 'paragraph' }] },
+                { type: 'detailsContent', content: [{ type: 'paragraph' }] },
+              ],
+            }).run()
+          }
+        }} active={editor.isActive('details')} title="토글 블록">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <path d="M3 4.5L6.5 8L10 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             <rect x="1" y="9.5" width="11" height="1" rx="0.5" fill="currentColor" opacity="0.4"/>

@@ -149,5 +149,6 @@ export const IPC = {
   APP_SHOW_MAIN:         'app:showMain',
   SETTINGS_GET:          'settings:get',
   SETTINGS_UPDATE:       'settings:update',
+  SETTINGS_UPDATED:      'settings:updated',
   THEME_CHANGED:         'theme:changed',
 } as const

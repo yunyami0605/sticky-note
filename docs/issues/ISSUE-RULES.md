@@ -48,7 +48,7 @@ ISSUE-{NNN}-{YYYY-MM-DD}-{짧은-설명}.md
 |------|------|
 | 번호 | 파일 링크 포함 (`[ISSUE-NNN](파일명)`) |
 | 제목 | 이슈 제목 (한국어) |
-| 진행도 | `open` / `in-progress` / `deferred` / `closed` |
+| 진행도 | `open` / `in-progress` / `resolved` / `deferred` / `closed` |
 | 내용 | 문제 현상 한 줄 요약 |
 | 테스트 결과 | 수정 후 검증 결과. 미검증이면 `-` |
 
@@ -59,7 +59,7 @@ ISSUE-{NNN}-{YYYY-MM-DD}-{짧은-설명}.md
 ```markdown
 # ISSUE-NNN: 제목
 
-**상태:** open | in-progress | deferred | closed  
+**상태:** open | in-progress | resolved | deferred | closed  
 **우선순위:** high | medium | low  
 **유형:** bug | improvement | feature | question  
 **생성일:** YYYY-MM-DD  
@@ -96,12 +96,18 @@ ISSUE-{NNN}-{YYYY-MM-DD}-{짧은-설명}.md
 
 ## 상태 값 정의
 
+```
+open → in-progress → resolved → closed
+                  ↘ deferred
+```
+
 | 상태 | 의미 |
 |------|------|
 | `open` | 미해결, 아직 작업 시작 전 |
 | `in-progress` | 현재 작업 중 |
+| `resolved` | 코드 반영 완료, 실제 동작 테스트 대기 |
 | `deferred` | 의도적으로 뒤로 미룸 (조건 명시 필요) |
-| `closed` | 해결 완료 |
+| `closed` | 테스트까지 완료된 최종 해결 상태 |
 
 ## 유형 값 정의
 
@@ -118,6 +124,7 @@ ISSUE-{NNN}-{YYYY-MM-DD}-{짧은-설명}.md
 
 1. **새 이슈 생성 시** — 파일 생성 후 `ISSUE-INDEX.md`도 즉시 업데이트
 2. **상태 변경 시** — 이슈 파일과 `ISSUE-INDEX.md` 동시 업데이트, 수정일 갱신
-3. **부분 해결 시** — 상태를 `deferred`로, "현재 적용"과 "추후 개선" 분리 기재
-4. **완전 해결 시** — 상태 `closed`, 테스트 결과 기재, 수정일 갱신
-5. **이슈 번호 재사용 금지** — closed 이슈 번호는 영구 보존
+3. **코드 반영 완료 시** — 상태를 `resolved`로, 테스트 결과란에 "테스트 대기" 기재
+4. **테스트 완료 시** — 상태를 `closed`로, 테스트 결과란에 검증 내용 기재
+5. **부분 해결 시** — 상태를 `deferred`로, "현재 적용"과 "추후 개선" 분리 기재
+6. **이슈 번호 재사용 금지** — closed 이슈 번호는 영구 보존
