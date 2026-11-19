@@ -1,21 +1,50 @@
-# Dependencies
+# ── Dependencies ─────────────────────────────────────────────
 node_modules/
 
-# Build output
+# ── Build output ─────────────────────────────────────────────
 out/
 dist/
+dist-build/
 
-# Logs
+# ── Electron builder cache ────────────────────────────────────
+.electron-builder/
+
+# ── Claude worktrees ─────────────────────────────────────────
+.claude/worktrees/
+
+# ── Logs ─────────────────────────────────────────────────────
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# macOS
+# ── macOS ─────────────────────────────────────────────────────
 .DS_Store
+*.DS_Store
+**/.DS_Store
 
-# Editor
+# ── Windows ──────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── Editor ───────────────────────────────────────────────────
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
-# Environment
+# ── Environment ──────────────────────────────────────────────
 .env
 .env.local
+.env.*.local
+
+# ── TypeScript ───────────────────────────────────────────────
+*.tsbuildinfo
+
+# ── Testing ──────────────────────────────────────────────────
+coverage/
+
+# ── Misc ─────────────────────────────────────────────────────
+ui.png

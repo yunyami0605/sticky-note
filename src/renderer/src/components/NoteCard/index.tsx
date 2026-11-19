@@ -189,7 +189,7 @@ function ContextMenu({ x, y, noteId, currentFolderId, isWindowOpen, isDark, onCl
 }
 
 export function NoteCard({ note, isDark = true, indent = false, selectionMode = false, selected = false, onToggleSelect }: Props): JSX.Element {
-  const { selectedId, setSelectedId, openWindowIds } = useNoteStore()
+  const { selectedId, setSelectedId, openWindowIds, toggleNoteWindow } = useNoteStore()
   const { tags, noteTagMap } = useTagStore()
   const isSelected = !selectionMode && selectedId === note.id
   const isWindowOpen = openWindowIds.has(note.id)
@@ -216,12 +216,17 @@ export function NoteCard({ note, isDark = true, indent = false, selectionMode = 
     }
   }
 
+  const handleDoubleClick = (): void => {
+    if (!selectionMode) toggleNoteWindow(note.id)
+  }
+
   const isHighlighted = isSelected || (selectionMode && selected)
 
   return (
     <>
       <div
         onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
         draggable={indent && !selectionMode}
         onDragStart={indent && !selectionMode ? (e) => {
@@ -266,11 +271,14 @@ export function NoteCard({ note, isDark = true, indent = false, selectionMode = 
         <div className="flex flex-col px-3 py-2.5 flex-1 min-w-0 gap-0.5">
           {/* 제목 */}
           <span
-            className="text-[12.5px] font-medium truncate leading-snug"
+            className="flex items-center gap-1.5 text-[12.5px] font-medium truncate leading-snug"
             style={{ color: 'var(--app-text)', letterSpacing: '-0.01em' }}
           >
-            {note.icon && <span className="mr-1">{note.icon}</span>}
-            {title}
+            {note.icon && <span className="flex-shrink-0">{note.icon}</span>}
+            {!note.content ? (
+              <span className="w-4 h-4 rounded-full bg-red-500 flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0">N</span>
+            ) : null}
+            <span className="truncate">{title}</span>
           </span>
 
           {/* 미리보기 */}

@@ -58,6 +58,10 @@ export function initDatabase(): void {
   if (!noteColumns.includes('folder_id')) db.exec(`ALTER TABLE notes ADD COLUMN folder_id TEXT`)
   if (!noteColumns.includes('icon')) db.exec(`ALTER TABLE notes ADD COLUMN icon TEXT`)
   if (!noteColumns.includes('sort_order')) db.exec(`ALTER TABLE notes ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`)
+  if (!noteColumns.includes('zoom_level')) {
+    db.exec(`ALTER TABLE notes ADD COLUMN zoom_level INTEGER NOT NULL DEFAULT 100`)
+    db.exec(`UPDATE notes SET zoom_level = CASE WHEN font_size = 'sm' THEN 85 WHEN font_size = 'lg' THEN 115 ELSE 100 END`)
+  }
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS settings (
@@ -107,7 +111,7 @@ function rowToNote(row: Record<string, unknown>): Note {
     position: { x: row.pos_x as number, y: row.pos_y as number },
     size: { width: row.width as number, height: row.height as number },
     isPinned: Boolean(row.is_pinned),
-    fontSize: row.font_size as Note['fontSize'],
+    fontSize: (row.zoom_level as number) ?? 100,
     folderId: (row.folder_id as string | null) ?? null,
     icon: (row.icon as string | null) ?? null,
     sortOrder: (row.sort_order as number) ?? 0,
@@ -132,7 +136,7 @@ export function createNote(payload: CreateNotePayload): Note {
     position: payload.position ?? { x: 120, y: 120 },
     size: DEFAULT_SIZE,
     isPinned: false,
-    fontSize: 'md',
+    fontSize: 100,
     folderId: payload.folderId ?? null,
     icon: null,
     sortOrder: maxRow.m + 1,
@@ -141,8 +145,8 @@ export function createNote(payload: CreateNotePayload): Note {
   }
 
   db.prepare(`
-    INSERT INTO notes (id, content, color, opacity, pos_x, pos_y, width, height, is_pinned, font_size, folder_id, icon, sort_order, created_at, updated_at)
-    VALUES (@id, @content, @color, @opacity, @posX, @posY, @width, @height, @isPinned, @fontSize, @folderId, @icon, @sortOrder, @createdAt, @updatedAt)
+    INSERT INTO notes (id, content, color, opacity, pos_x, pos_y, width, height, is_pinned, font_size, zoom_level, folder_id, icon, sort_order, created_at, updated_at)
+    VALUES (@id, @content, @color, @opacity, @posX, @posY, @width, @height, @isPinned, @fontSize, @zoomLevel, @folderId, @icon, @sortOrder, @createdAt, @updatedAt)
   `).run({
     id: note.id,
     content: note.content,
@@ -153,7 +157,8 @@ export function createNote(payload: CreateNotePayload): Note {
     width: note.size.width,
     height: note.size.height,
     isPinned: note.isPinned ? 1 : 0,
-    fontSize: note.fontSize,
+    fontSize: 'md',
+    zoomLevel: 100,
     folderId: note.folderId,
     icon: note.icon,
     sortOrder: note.sortOrder,
@@ -181,7 +186,7 @@ export function updateNote(id: string, payload: UpdateNotePayload): Note | null 
       width      = @width,
       height     = @height,
       is_pinned  = @isPinned,
-      font_size  = @fontSize,
+      zoom_level = @zoomLevel,
       folder_id  = @folderId,
       icon       = @icon,
       sort_order = @sortOrder,
@@ -197,7 +202,7 @@ export function updateNote(id: string, payload: UpdateNotePayload): Note | null 
     width: payload.size?.width ?? (existing.width as number),
     height: payload.size?.height ?? (existing.height as number),
     isPinned: (payload.isPinned ?? Boolean(existing.is_pinned)) ? 1 : 0,
-    fontSize: payload.fontSize ?? (existing.font_size as string),
+    zoomLevel: payload.fontSize ?? (existing.zoom_level as number) ?? 100,
     folderId: 'folderId' in payload ? payload.folderId : (existing.folder_id as string | null),
     icon: 'icon' in payload ? payload.icon : (existing.icon as string | null),
     sortOrder: payload.sortOrder ?? (existing.sort_order as number) ?? 0,
@@ -297,7 +302,7 @@ export function duplicateFolder(id: string): { folder: Folder; notes: Note[] } |
     const note = createNote({ color: srcNote.color as NoteColor, folderId: newFolder.id })
     const updated = updateNote(note.id, {
       content: srcNote.content as string,
-      fontSize: srcNote.font_size as Note['fontSize'],
+      fontSize: (srcNote.zoom_level as number) ?? 100,
       opacity: srcNote.opacity as number,
       size: { width: srcNote.width as number, height: srcNote.height as number },
       icon: srcNote.icon as string | null,

@@ -1,5 +1,4 @@
 export type NoteColor = 'yellow' | 'blue' | 'green' | 'pink' | 'purple' | 'white'
-export type FontSize = 'sm' | 'md' | 'lg'
 export type ThemeMode = 'dark' | 'light'
 export type ThemeColor = 'navy' | 'midnight' | 'ocean' | 'forest' | 'rose' | 'slate'
 export type StartBehavior = 'tray' | 'main'
@@ -23,7 +22,7 @@ export interface Note {
   position: NotePosition
   size: NoteSize
   isPinned: boolean
-  fontSize: FontSize
+  fontSize: number
   folderId: string | null
   icon: string | null
   sortOrder: number
@@ -90,7 +89,7 @@ export interface UpdateNotePayload {
   position?: NotePosition
   size?: NoteSize
   isPinned?: boolean
-  fontSize?: FontSize
+  fontSize?: number
   folderId?: string | null
   icon?: string | null
   sortOrder?: number

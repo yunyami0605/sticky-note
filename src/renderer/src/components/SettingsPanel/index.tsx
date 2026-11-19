@@ -20,95 +20,45 @@ function ThemeColorPicker({
   isDark: boolean
   onChange: (c: ThemeColor) => void
 }): JSX.Element {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const currentColor = colors.find((c) => c.value === current)
-
-  useEffect(() => {
-    const handler = (e: MouseEvent): void => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
   return (
     <section>
       <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--app-text-muted)' }}>
         테마 색상
       </p>
-      <div ref={ref} className="relative">
-        {/* 현재 색상 표시 버튼 */}
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg transition-colors"
-          style={{
-            backgroundColor: 'var(--app-hover)',
-            border: '1px solid var(--app-border)',
-          }}
-        >
-          <span
-            className="w-4 h-4 rounded-full flex-shrink-0"
+      <div className="flex gap-2 flex-wrap">
+        {colors.map((c) => (
+          <button
+            key={c.value}
+            onClick={() => onChange(c.value)}
+            title={c.label}
+            className="relative w-8 h-8 rounded-full flex-shrink-0 transition-transform hover:scale-110 flex items-center justify-center"
             style={{
-              backgroundColor: currentColor?.bg,
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'}`,
-            }}
-          />
-          <span className="flex-1 text-xs text-left font-medium" style={{ color: 'var(--app-text)' }}>
-            {currentColor?.label}
-          </span>
-          <svg
-            width="10" height="10" viewBox="0 0 10 10" fill="none"
-            className="transition-transform"
-            style={{ color: 'var(--app-text-muted)', transform: open ? 'rotate(180deg)' : 'none' }}
-          >
-            <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-
-        {/* 팝업 색상 그리드 */}
-        {open && (
-          <div
-            className="absolute top-full left-0 mt-1.5 p-3 rounded-xl shadow-2xl border z-50 w-full"
-            style={{
-              backgroundColor: isDark ? '#1e1e30' : '#ffffff',
-              borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
+              backgroundColor: c.bg,
+              border: current === c.value
+                ? '2px solid rgba(99,102,241,0.9)'
+                : `1.5px solid ${isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.14)'}`,
+              boxShadow: current === c.value
+                ? '0 0 0 3px rgba(99,102,241,0.25)'
+                : 'none',
             }}
           >
-            <div className="flex flex-col gap-1">
-              {colors.map((c) => (
-                <button
-                  key={c.value}
-                  onClick={() => { onChange(c.value); setOpen(false) }}
-                  className="flex items-center gap-3 w-full px-2 py-1.5 rounded-lg transition-colors text-left"
-                  style={{
-                    backgroundColor: current === c.value
-                      ? isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'
-                      : 'transparent',
-                  }}
-                >
-                  <span
-                    className="w-5 h-5 rounded-full flex-shrink-0"
-                    style={{
-                      backgroundColor: c.bg,
-                      border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}`,
-                    }}
-                  />
-                  <span className="flex-1 text-xs font-medium" style={{ color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.75)' }}>
-                    {c.label}
-                  </span>
-                  {current === c.value && (
-                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                      <path d="M2 5.5L4.5 8L9 3" stroke={isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)'}
-                        strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+            {current === c.value && (
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path
+                  d="M2.5 6L5 8.5L9.5 3.5"
+                  stroke={isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.6)'}
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
+          </button>
+        ))}
       </div>
+      <p className="mt-1.5 text-[10px]" style={{ color: 'var(--app-text-dim)' }}>
+        {colors.find((c) => c.value === current)?.label}
+      </p>
     </section>
   )
 }

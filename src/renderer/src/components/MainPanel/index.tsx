@@ -443,6 +443,8 @@ interface TreeSectionProps {
   onCancelSelection?: () => void
   onNoteDropOnNote?: (draggedId: string, targetId: string, before: boolean) => void
   subContent?: React.ReactNode
+  sortBy?: SortBy
+  onCycleSort?: () => void
 }
 
 function TreeSection({
@@ -450,7 +452,7 @@ function TreeSection({
   onToggle, onNewNote, onDelete, onRename, renamingContent,
   onDropNote, onDropFolder, onNestFolder, draggableFolder, onFolderDragStart,
   onContextMenu, selectionState, onToggleNoteSelect, onDeleteSelected, onCancelSelection,
-  onNoteDropOnNote, subContent,
+  onNoteDropOnNote, subContent, sortBy, onCycleSort,
 }: TreeSectionProps): JSX.Element {
   const isSelecting = selectionState?.sectionId === sectionId
   const selectedCount = isSelecting ? selectionState!.selected.size : 0
@@ -577,6 +579,45 @@ function TreeSection({
           className="opacity-0 group-hover:opacity-100 flex items-center pr-1.5 gap-0.5 flex-shrink-0 transition-opacity"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
+          {onCycleSort && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onCycleSort() }}
+              className="w-5 h-5 flex items-center justify-center rounded hover:opacity-70"
+              style={{ color: 'var(--app-text-dim)' }}
+              title={`정렬: ${sortBy ?? 'updatedAt'}`}
+            >
+              {sortBy === 'createdAt' ? (
+                // 달력 아이콘
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                  <rect x="1" y="2" width="9" height="8" rx="1" stroke="currentColor" strokeWidth="1.1"/>
+                  <path d="M3.5 1v2M7.5 1v2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+                  <path d="M1 5h9" stroke="currentColor" strokeWidth="1.1"/>
+                </svg>
+              ) : sortBy === 'manual' ? (
+                // 드래그 아이콘
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                  <circle cx="3.5" cy="3.5" r="1" fill="currentColor"/>
+                  <circle cx="7.5" cy="3.5" r="1" fill="currentColor"/>
+                  <circle cx="3.5" cy="7.5" r="1" fill="currentColor"/>
+                  <circle cx="7.5" cy="7.5" r="1" fill="currentColor"/>
+                </svg>
+              ) : sortBy === 'color' ? (
+                // 팔레트 아이콘
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                  <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.1"/>
+                  <circle cx="3.5" cy="4" r="1" fill="currentColor"/>
+                  <circle cx="7" cy="4" r="1" fill="currentColor"/>
+                  <circle cx="5.5" cy="7" r="1" fill="currentColor"/>
+                </svg>
+              ) : (
+                // 시계 아이콘 (updatedAt 기본)
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                  <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.1"/>
+                  <path d="M5.5 3v2.5l1.5 1.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </button>
+          )}
           <button
             onClick={(e) => { e.stopPropagation(); onNewNote() }}
             className="w-5 h-5 flex items-center justify-center rounded hover:opacity-70 text-sm leading-none"
@@ -652,19 +693,23 @@ function TreeSection({
 // ── 사이드바 트리 전체 ─────────────────────────────────────────
 function SidebarTree({
   searchQuery,
-  sortBy,
-  setSortBy,
+  globalSortBy,
   isDark,
   addFolderTrigger,
   onAddFolderTriggered,
 }: {
   searchQuery: string
-  sortBy: SortBy
-  setSortBy: (s: SortBy) => void
+  globalSortBy: SortBy
   isDark: boolean
   addFolderTrigger: boolean
   onAddFolderTriggered: () => void
 }): JSX.Element {
+  const [sortByMap, setSortByMap] = useState<Record<string, SortBy>>({})
+
+  useEffect(() => { setSortByMap({}) }, [globalSortBy])
+
+  const getSectionSort = (id: string): SortBy => sortByMap[id] ?? globalSortBy
+  const setSectionSort = (id: string, s: SortBy): void => setSortByMap((prev) => ({ ...prev, [id]: s }))
   const { notes, createNote, updateNote, deleteNote, reorderNotes } = useNoteStore()
   const { folders, load, createFolder, renameFolder, deleteFolder, duplicateFolder, nestFolder, reorderFolders, moveFolder } = useFolderStore()
   const { selectedTagId, noteTagMap, loadNoteTagIds } = useTagStore()
@@ -717,10 +762,15 @@ function SidebarTree({
     return ns
   }, [notes, selectedTagId, noteTagMap, searchQuery])
 
-  const uncategorized = useMemo(() => sortNotes(filtered.filter((n) => !n.folderId), sortBy), [filtered, sortBy])
+  const uncategorized = useMemo(
+    () => sortNotes(filtered.filter((n) => !n.folderId), getSectionSort('uncategorized')),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, sortByMap, globalSortBy]
+  )
   const folderNotes = useCallback(
-    (folderId: string) => sortNotes(filtered.filter((n) => n.folderId === folderId), sortBy),
-    [filtered, sortBy]
+    (folderId: string) => sortNotes(filtered.filter((n) => n.folderId === folderId), getSectionSort(folderId)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, sortByMap, globalSortBy]
   )
 
   // 검색 중이면 자동으로 모든 섹션 펼치기
@@ -782,8 +832,8 @@ function SidebarTree({
       void updateNote(draggedId, { folderId: targetFolderId })
     }
     void reorderNotes(newOrder.map((n, i) => ({ id: n.id, sortOrder: i })))
-    setSortBy('manual')
-  }, [notes, updateNote, reorderNotes, setSortBy])
+    setSortByMap((prev) => ({ ...prev, [sectionId]: 'manual' }))
+  }, [notes, updateNote, reorderNotes])
 
   const handleContextMenu = useCallback((e: React.MouseEvent, sectionId: string | null) => {
     e.preventDefault()
@@ -840,6 +890,12 @@ function SidebarTree({
         onDeleteSelected={handleDeleteSelected}
         onCancelSelection={() => setSelectionState(null)}
         onNoteDropOnNote={(dId, tId, before) => handleNoteDropOnNote(folder.id, dId, tId, before)}
+        sortBy={getSectionSort(folder.id)}
+        onCycleSort={() => {
+          const sorts: SortBy[] = ['updatedAt', 'createdAt', 'manual']
+          const cur = getSectionSort(folder.id)
+          setSectionSort(folder.id, sorts[(sorts.indexOf(cur) + 1) % sorts.length])
+        }}
         renamingContent={isRenaming ? (
           <input
             autoFocus
@@ -1152,8 +1208,7 @@ export function MainPanel(): JSX.Element {
           ) : (
             <SidebarTree
               searchQuery={searchQuery}
-              sortBy={sortBy}
-              setSortBy={setSortBy}
+              globalSortBy={sortBy}
               isDark={isDark}
               addFolderTrigger={addFolderTrigger}
               onAddFolderTriggered={() => setAddFolderTrigger(false)}

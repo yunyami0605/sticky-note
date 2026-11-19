@@ -56,7 +56,14 @@ export const SLASH_COMMANDS: CommandItem[] = [
     description: '▶ 접기/펼치기 블록',
     icon: '▶',
     command: ({ editor, range }) =>
-      editor.chain().focus().deleteRange(range).setDetails().run(),
+      editor.chain().focus().deleteRange(range).insertContent({
+        type: 'details',
+        attrs: { open: true },
+        content: [
+          { type: 'detailsSummary', content: [{ type: 'paragraph' }] },
+          { type: 'detailsContent', content: [{ type: 'paragraph' }] },
+        ],
+      }).run(),
   },
   {
     title: '콜아웃',

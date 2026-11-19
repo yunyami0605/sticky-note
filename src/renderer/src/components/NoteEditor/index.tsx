@@ -14,18 +14,12 @@ import { Callout } from '../../extensions/Callout'
 import { SlashCommand } from '../../extensions/SlashCommand'
 import { Mention, MentionNode } from '../../extensions/Mention'
 import { DragHandle } from '../../extensions/DragHandle'
-import type { Note, UpdateNotePayload, NoteColor, FontSize as NoteFontSize } from '../../../../shared/types'
+import type { Note, UpdateNotePayload, NoteColor } from '../../../../shared/types'
 import { useSettingsStore } from '../../store/settingsStore'
 import { Toolbar } from '../Toolbar'
 import { ColorPicker } from '../ColorPicker'
 
 const lowlight = createLowlight(common)
-
-const FONT_SIZE_CLASS: Record<NoteFontSize, string> = {
-  sm: 'text-sm',
-  md: 'text-base',
-  lg: 'text-lg',
-}
 
 interface Props {
   note: Note
@@ -34,7 +28,7 @@ interface Props {
 
 export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const { spellCheck, load: loadSettings } = useSettingsStore()
+  const { spellCheck, editorFontSize, editorTextColor, load: loadSettings } = useSettingsStore()
 
   useEffect(() => { loadSettings() }, [])
 
@@ -88,6 +82,31 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
     } catch { /* ignore */ }
   }, [note.content, editor])
 
+  // 창 내 zoom 단축키
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => {
+      const isMod = e.metaKey || e.ctrlKey
+      if (!isMod) return
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault()
+        const newZoom = Math.min(200, note.fontSize + 10)
+        persistUpdate({ fontSize: newZoom })
+        onNoteChange({ ...note, fontSize: newZoom })
+      } else if (e.key === '-') {
+        e.preventDefault()
+        const newZoom = Math.max(50, note.fontSize - 10)
+        persistUpdate({ fontSize: newZoom })
+        onNoteChange({ ...note, fontSize: newZoom })
+      } else if (e.key === '0') {
+        e.preventDefault()
+        persistUpdate({ fontSize: 100 })
+        onNoteChange({ ...note, fontSize: 100 })
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [note, persistUpdate, onNoteChange])
+
   const handleColorChange = (color: NoteColor): void => {
     // 즉시 로컬 state 반영 후 DB 저장
     onNoteChange({ ...note, color })
@@ -108,11 +127,10 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
     window.api.note.closeWindow(note.id)
   }
 
-  const cycleFontSize = (): void => {
-    const sizes: NoteFontSize[] = ['sm', 'md', 'lg']
-    const fontSize = sizes[(sizes.indexOf(note.fontSize) + 1) % sizes.length]
-    onNoteChange({ ...note, fontSize })
-    window.api.note.update(note.id, { fontSize })
+  const handleZoomChange = (delta: number): void => {
+    const newZoom = Math.min(200, Math.max(50, note.fontSize + delta))
+    persistUpdate({ fontSize: newZoom })
+    onNoteChange({ ...note, fontSize: newZoom })
   }
 
   const handleOpacityChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
@@ -185,24 +203,34 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
       </div>
 
       {/* editor area */}
-      <div className={`flex-1 overflow-y-auto pl-8 pr-3 py-2 ${FONT_SIZE_CLASS[note.fontSize]}`}>
+      <div
+        className="flex-1 overflow-y-auto pl-8 pr-3 py-2"
+        style={{ fontSize: Math.round(editorFontSize * note.fontSize / 100), color: editorTextColor || undefined }}
+      >
         <EditorContent editor={editor} className="tiptap h-full" spellCheck={spellCheck} />
       </div>
 
       {/* toolbar */}
       <Toolbar editor={editor} />
 
-      {/* footer: font size + opacity */}
+      {/* footer: zoom + opacity */}
       <div className="flex items-center gap-3 px-3 py-1.5 border-t border-black/10">
-        <button
-          onClick={cycleFontSize}
-          className="flex items-center gap-1 text-[10px] font-medium transition-opacity hover:opacity-100 flex-shrink-0"
-          style={{ opacity: 0.45 }}
-          title="글자 크기 변경"
-        >
-          <span style={{ fontSize: 11, fontWeight: 700 }}>A</span>
-          <span style={{ fontSize: 9 }}>{note.fontSize === 'sm' ? 'S' : note.fontSize === 'md' ? 'M' : 'L'}</span>
-        </button>
+        <div className="flex items-center gap-0.5 flex-shrink-0" style={{ opacity: 0.5 }}>
+          <button
+            onClick={() => handleZoomChange(-10)}
+            className="w-5 h-5 flex items-center justify-center rounded hover:opacity-70 text-xs font-bold"
+            title="글자 배율 축소 (Cmd+-)"
+          >−</button>
+          <span
+            className="text-[10px] font-medium tabular-nums min-w-[32px] text-center"
+            title="글자 배율 (Cmd+0으로 초기화)"
+          >{note.fontSize}%</span>
+          <button
+            onClick={() => handleZoomChange(10)}
+            className="w-5 h-5 flex items-center justify-center rounded hover:opacity-70 text-xs font-bold"
+            title="글자 배율 확대 (Cmd+=)"
+          >+</button>
+        </div>
         <div className="flex items-center gap-1.5 flex-1" style={{ opacity: 0.4 }} title="투명도">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
             <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2" strokeDasharray="2 1.5"/>

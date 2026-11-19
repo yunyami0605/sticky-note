@@ -3,7 +3,7 @@ import { Node, mergeAttributes } from '@tiptap/core'
 export const Callout = Node.create({
   name: 'callout',
   group: 'block',
-  content: 'inline*',
+  content: 'block+',
 
   addAttributes() {
     return {

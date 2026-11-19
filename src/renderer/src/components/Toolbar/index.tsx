@@ -495,13 +495,38 @@ function HighlightPicker({ editor, dark }: { editor: Editor; dark?: boolean }): 
 
 // ── 메인 툴바 ──────────────────────────────────────────────────
 export function Toolbar({ editor, dark }: Props): JSX.Element | null {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [collapsed, setCollapsed] = useState(false)
+  const [popupOpen, setPopupOpen] = useState(false)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setCollapsed(entry.contentRect.width < 300)
+      }
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  // 팝업 외부 클릭 시 닫기
+  useEffect(() => {
+    if (!popupOpen) return
+    const handler = (e: MouseEvent): void => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setPopupOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [popupOpen])
+
   if (!editor) return null
 
-  return (
-    <div
-      className="flex items-center gap-1 px-2.5 py-2 flex-wrap"
-      style={{ borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}` }}
-    >
+  const renderButtons = (): JSX.Element => (
+    <>
       {/* 서식 그룹 */}
       <ToolGroup dark={dark}>
         <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="굵게 (⌘B)">
@@ -604,6 +629,59 @@ export function Toolbar({ editor, dark }: Props): JSX.Element | null {
         <TextColorPicker editor={editor} dark={dark} />
         <HighlightPicker editor={editor} dark={dark} />
       </div>
+    </>
+  )
+
+  if (!collapsed) {
+    return (
+      <div
+        ref={containerRef}
+        className="flex items-center gap-1 px-2.5 py-2 flex-wrap"
+        style={{ borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}` }}
+      >
+        {renderButtons()}
+      </div>
+    )
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative flex items-center justify-end px-2 py-1.5"
+      style={{ borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}` }}
+    >
+      <button
+        onMouseDown={(e) => { e.preventDefault(); setPopupOpen((v) => !v) }}
+        title="서식 도구"
+        className="w-7 h-7 flex items-center justify-center rounded-md transition-colors"
+        style={{
+          backgroundColor: popupOpen
+            ? (dark ? 'rgba(99,102,241,0.3)' : 'rgba(99,102,241,0.14)')
+            : (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
+          color: popupOpen
+            ? (dark ? '#a5b4fc' : '#6366f1')
+            : (dark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)'),
+        }}
+      >
+        {/* 편집 아이콘 */}
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <path d="M9 1.5L11.5 4L5 10.5H2.5V8L9 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+          <path d="M1.5 12h10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity="0.5"/>
+        </svg>
+      </button>
+
+      {popupOpen && (
+        <div
+          className="absolute bottom-full right-0 mb-1 rounded-xl shadow-2xl border z-50 p-2 flex flex-wrap gap-1"
+          style={{
+            backgroundColor: dark ? '#1e1e2e' : '#ffffff',
+            borderColor: dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)',
+            minWidth: 260,
+          }}
+        >
+          {renderButtons()}
+        </div>
+      )}
     </div>
   )
 }
