@@ -115,6 +115,18 @@ export interface UpdateTagPayload {
   color?: string
 }
 
+export interface CustomEmoji {
+  id: string
+  name: string
+  path: string      // absolute filesystem path
+  createdAt: string
+}
+
+export interface AddCustomEmojiPayload {
+  name: string
+  filePath: string  // source file path (from renderer file input)
+}
+
 // IPC channel names — single source of truth
 export const IPC = {
   NOTE_GET_ALL:          'note:getAll',
@@ -151,4 +163,7 @@ export const IPC = {
   SETTINGS_UPDATE:       'settings:update',
   SETTINGS_UPDATED:      'settings:updated',
   THEME_CHANGED:         'theme:changed',
+  CUSTOM_EMOJI_GET_ALL:  'customEmoji:getAll',
+  CUSTOM_EMOJI_ADD:      'customEmoji:add',
+  CUSTOM_EMOJI_DELETE:   'customEmoji:delete',
 } as const

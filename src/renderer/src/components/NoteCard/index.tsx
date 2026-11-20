@@ -3,6 +3,7 @@ import type { Note } from '../../../../shared/types'
 import { useNoteStore } from '../../store/noteStore'
 import { useTagStore } from '../../store/tagStore'
 import { useFolderStore } from '../../store/folderStore'
+import { useCustomEmojiStore } from '../../store/customEmojiStore'
 
 const COLOR_ACCENT: Record<Note['color'], string> = {
   yellow: 'bg-amber-400',
@@ -191,6 +192,7 @@ function ContextMenu({ x, y, noteId, currentFolderId, isWindowOpen, isDark, onCl
 export function NoteCard({ note, isDark = true, indent = false, selectionMode = false, selected = false, onToggleSelect }: Props): JSX.Element {
   const { selectedId, setSelectedId, openWindowIds, toggleNoteWindow } = useNoteStore()
   const { tags, noteTagMap } = useTagStore()
+  const { emojis: customEmojis } = useCustomEmojiStore()
   const isSelected = !selectionMode && selectedId === note.id
   const isWindowOpen = openWindowIds.has(note.id)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
@@ -274,7 +276,14 @@ export function NoteCard({ note, isDark = true, indent = false, selectionMode = 
             className="flex items-center gap-1.5 text-[12.5px] font-medium truncate leading-snug"
             style={{ color: 'var(--app-text)', letterSpacing: '-0.01em' }}
           >
-            {note.icon && <span className="flex-shrink-0">{note.icon}</span>}
+            {note.icon && (
+              note.icon.startsWith('custom:')
+                ? (() => {
+                    const ce = customEmojis.find(e => e.id === note.icon!.slice(7))
+                    return ce ? <img src={`file://${ce.path}`} alt={ce.name} className="w-4 h-4 object-contain flex-shrink-0" /> : null
+                  })()
+                : <span className="flex-shrink-0">{note.icon}</span>
+            )}
             {!note.content ? (
               <span className="w-4 h-4 rounded-full bg-red-500 flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0">N</span>
             ) : null}

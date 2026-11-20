@@ -8,9 +8,10 @@ import {
   getAllFolders, createFolder, updateFolder, deleteFolder, duplicateFolder,
   getAllTags, createTag, updateTag, deleteTag,
   getNoteTagIds, setNoteTag, removeNoteTag, markdownToTiptapJSON,
+  getAllCustomEmojis, addCustomEmoji, deleteCustomEmoji,
 } from './services/database'
 import { IPC } from '../shared/types'
-import type { CreateNotePayload, UpdateNotePayload, AppSettings, CreateFolderPayload, UpdateFolderPayload, CreateTagPayload, UpdateTagPayload } from '../shared/types'
+import type { CreateNotePayload, UpdateNotePayload, AppSettings, CreateFolderPayload, UpdateFolderPayload, CreateTagPayload, UpdateTagPayload, AddCustomEmojiPayload } from '../shared/types'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -365,6 +366,12 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.NOTE_SET_TAG, (_e, noteId: string, tagId: string) => { setNoteTag(noteId, tagId) })
 
   ipcMain.handle(IPC.NOTE_REMOVE_TAG, (_e, noteId: string, tagId: string) => { removeNoteTag(noteId, tagId) })
+
+  ipcMain.handle(IPC.CUSTOM_EMOJI_GET_ALL, () => getAllCustomEmojis())
+
+  ipcMain.handle(IPC.CUSTOM_EMOJI_ADD, (_e, payload: AddCustomEmojiPayload) => addCustomEmoji(payload))
+
+  ipcMain.handle(IPC.CUSTOM_EMOJI_DELETE, (_e, id: string) => deleteCustomEmoji(id))
 }
 
 app.whenReady().then(() => {

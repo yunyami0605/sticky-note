@@ -4,6 +4,7 @@ import type {
   CreateNotePayload, UpdateNotePayload, Note, AppSettings,
   Folder, CreateFolderPayload, UpdateFolderPayload,
   Tag, CreateTagPayload, UpdateTagPayload,
+  CustomEmoji, AddCustomEmojiPayload,
 } from '../shared/types'
 
 const api = {
@@ -77,6 +78,11 @@ const api = {
     getForNote: (noteId: string): Promise<string[]> => ipcRenderer.invoke(IPC.NOTE_GET_TAGS, noteId),
     setForNote: (noteId: string, tagId: string): Promise<void> => ipcRenderer.invoke(IPC.NOTE_SET_TAG, noteId, tagId),
     removeFromNote: (noteId: string, tagId: string): Promise<void> => ipcRenderer.invoke(IPC.NOTE_REMOVE_TAG, noteId, tagId),
+  },
+  customEmoji: {
+    getAll: (): Promise<CustomEmoji[]> => ipcRenderer.invoke(IPC.CUSTOM_EMOJI_GET_ALL),
+    add: (payload: AddCustomEmojiPayload): Promise<CustomEmoji> => ipcRenderer.invoke(IPC.CUSTOM_EMOJI_ADD, payload),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke(IPC.CUSTOM_EMOJI_DELETE, id),
   },
 }
 

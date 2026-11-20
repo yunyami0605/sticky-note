@@ -2,11 +2,13 @@ import Database from 'better-sqlite3'
 import { app } from 'electron'
 import path from 'path'
 import { v4 as uuidv4 } from 'uuid'
+import fs from 'fs'
 import type {
   Note, CreateNotePayload, UpdateNotePayload, NoteColor, AppSettings,
   ThemeMode, ThemeColor, StartBehavior, ShortcutSettings,
   Folder, CreateFolderPayload, UpdateFolderPayload,
   Tag, CreateTagPayload, UpdateTagPayload,
+  CustomEmoji, AddCustomEmojiPayload,
 } from '../../shared/types'
 
 function defaultShortcuts(platform: string): ShortcutSettings {
@@ -96,6 +98,15 @@ export function initDatabase(): void {
       note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
       tag_id  TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
       PRIMARY KEY (note_id, tag_id)
+    )
+  `)
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS custom_emojis (
+      id         TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      filename   TEXT NOT NULL,
+      created_at TEXT NOT NULL
     )
   `)
 }
@@ -605,6 +616,43 @@ export function markdownToTiptapJSON(md: string): string {
   }
 
   return JSON.stringify({ type: 'doc', content: blocks.length ? blocks : [{ type: 'paragraph' }] })
+}
+
+// ── Custom Emojis ─────────────────────────────────────────────
+
+export function getAllCustomEmojis(): CustomEmoji[] {
+  const emojiDir = path.join(app.getPath('userData'), 'custom-emojis')
+  const rows = db.prepare('SELECT * FROM custom_emojis ORDER BY created_at ASC').all() as Record<string, string>[]
+  return rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    path: path.join(emojiDir, row.filename),
+    createdAt: row.created_at,
+  }))
+}
+
+export function addCustomEmoji(payload: AddCustomEmojiPayload): CustomEmoji {
+  const emojiDir = path.join(app.getPath('userData'), 'custom-emojis')
+  if (!fs.existsSync(emojiDir)) fs.mkdirSync(emojiDir, { recursive: true })
+  const id = uuidv4()
+  const ext = path.extname(payload.filePath)
+  const filename = `${id}${ext}`
+  const destPath = path.join(emojiDir, filename)
+  fs.copyFileSync(payload.filePath, destPath)
+  const now = new Date().toISOString()
+  db.prepare('INSERT INTO custom_emojis (id, name, filename, created_at) VALUES (?, ?, ?, ?)')
+    .run(id, payload.name, filename, now)
+  return { id, name: payload.name, path: destPath, createdAt: now }
+}
+
+export function deleteCustomEmoji(id: string): boolean {
+  const row = db.prepare('SELECT filename FROM custom_emojis WHERE id = ?').get(id) as { filename: string } | undefined
+  if (!row) return false
+  const emojiDir = path.join(app.getPath('userData'), 'custom-emojis')
+  const filePath = path.join(emojiDir, row.filename)
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+  db.prepare('DELETE FROM custom_emojis WHERE id = ?').run(id)
+  return true
 }
 
 export function getNoteTitle(content: string): string {

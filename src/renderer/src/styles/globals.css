@@ -222,7 +222,7 @@
   background: rgba(0,0,0,0.065);
 }
 
-/* 토글 블록 (Details) */
+/* 토글 블록 (Details) — native <details> fallback */
 .tiptap details {
   border: 1px solid rgba(128,128,128,0.15);
   border-radius: 10px;
@@ -255,6 +255,62 @@
 }
 .tiptap details > div {
   padding: 0.35rem 0.8rem 0.4rem;
+}
+
+/* 토글 블록 NodeView (data-type="details") — Tiptap NodeView 실제 DOM */
+.tiptap [data-type="details"] {
+  position: relative;
+  margin: 0.3rem 0;
+}
+/* NodeView가 삽입하는 빈 <button> → 화살표 아이콘으로 표시 */
+.tiptap [data-type="details"] > button {
+  position: absolute;
+  left: 0.1rem;
+  top: 0.42rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.35;
+  transition: transform 0.15s ease, opacity 0.15s;
+  z-index: 1;
+  padding: 0;
+}
+.tiptap [data-type="details"] > button::after {
+  content: '▶';
+  font-size: 0.55em;
+  display: block;
+  line-height: 1;
+}
+.tiptap [data-type="details"] > button:hover { opacity: 0.7; }
+.tiptap [data-type="details"].is-open > button {
+  transform: rotate(90deg);
+  opacity: 0.55;
+}
+/* <summary> 는 contentDOM wrapper 내부에 렌더링됨 → list-item 기본값 제거 */
+.tiptap [data-type="details"] summary {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  padding: 0.25rem 0.4rem 0.25rem 1.6rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  min-height: 1.8rem;
+  cursor: text;
+}
+.tiptap [data-type="details"] summary::-webkit-details-marker { display: none; }
+.tiptap [data-type="details"] summary::marker { display: none; }
+/* detailsContent 는 extension이 hidden 속성으로 직접 제어 */
+/* Tailwind v4 preflight 에 [hidden] 규칙이 없으므로 명시적 추가 */
+.tiptap [data-type="detailsContent"][hidden] {
+  display: none !important;
+}
+.tiptap [data-type="details"] [data-type="detailsContent"] {
+  padding: 0.1rem 0.4rem 0.2rem 1.6rem;
 }
 
 /* 콜아웃 (Callout) */

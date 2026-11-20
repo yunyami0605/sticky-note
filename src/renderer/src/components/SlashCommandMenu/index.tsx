@@ -56,13 +56,23 @@ export const SLASH_COMMANDS: CommandItem[] = [
     description: '▶ 접기/펼치기 블록',
     icon: '▶',
     command: ({ editor, range }) =>
-      editor.chain().focus().deleteRange(range).insertContent({
-        type: 'details',
-        attrs: { open: true },
-        content: [
-          { type: 'detailsSummary', content: [{ type: 'paragraph' }] },
-          { type: 'detailsContent', content: [{ type: 'paragraph' }] },
-        ],
+      editor.chain().focus().deleteRange(range).command(({ state, dispatch }) => {
+        const { schema, selection } = state
+        const { $from } = selection
+        if (!schema.nodes.details || !schema.nodes.detailsSummary || !schema.nodes.detailsContent) return false
+        if ($from.depth < 1) return false
+        const topNode = $from.node(1)
+        const topIsParag = topNode.type === schema.nodes.paragraph
+        const summary = schema.nodes.detailsSummary.create({}, topIsParag ? topNode.content : undefined)
+        const detailContent = schema.nodes.detailsContent.create({}, schema.nodes.paragraph.create())
+        const details = schema.nodes.details.create({ open: true }, [summary, detailContent])
+        if (!dispatch) return true
+        if (topIsParag) {
+          dispatch(state.tr.replaceWith($from.before(1), $from.after(1), details))
+        } else {
+          dispatch(state.tr.insert($from.after(1), details))
+        }
+        return true
       }).run(),
   },
   {

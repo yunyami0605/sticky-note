@@ -16,8 +16,10 @@ import { Mention, MentionNode } from '../../extensions/Mention'
 import { DragHandle } from '../../extensions/DragHandle'
 import type { Note, UpdateNotePayload, NoteColor } from '../../../../shared/types'
 import { useSettingsStore } from '../../store/settingsStore'
+import { useCustomEmojiStore } from '../../store/customEmojiStore'
 import { Toolbar } from '../Toolbar'
 import { ColorPicker } from '../ColorPicker'
+import EmojiPicker from '../EmojiPicker'
 import { SelectionToolbar } from '../SelectionToolbar'
 
 const lowlight = createLowlight(common)
@@ -27,10 +29,19 @@ interface Props {
   onNoteChange: (updated: Note) => void
 }
 
+function CustomEmojiIcon({ id }: { id: string }): JSX.Element {
+  const { emojis } = useCustomEmojiStore()
+  const ce = emojis.find(e => e.id === id)
+  if (!ce) return <span>🏷️</span>
+  return <img src={`file://${ce.path}`} alt={ce.name} className="w-4 h-4 object-contain inline" />
+}
+
 export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const emojiButtonRef = useRef<HTMLButtonElement>(null)
   const { spellCheck, editorFontSize, editorTextColor, load: loadSettings, applyBroadcast } = useSettingsStore()
   const [zoomInput, setZoomInput] = useState<string | null>(null)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
 
   useEffect(() => {
     loadSettings()
@@ -59,7 +70,7 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
       Color,
       Highlight.configure({ multicolor: true }),
       CodeBlockLowlight.configure({ lowlight }),
-      Details,
+      Details.configure({ persist: true }),
       DetailsContent,
       DetailsSummary,
       Callout,
@@ -193,18 +204,29 @@ export function NoteEditor({ note, onNoteChange }: Props): JSX.Element {
         >
           {/* 이모지 아이콘 */}
           <button
+            ref={emojiButtonRef}
             title="이모지 아이콘"
             className="text-sm opacity-60 hover:opacity-100 transition-opacity"
-            onClick={() => {
-              const emoji = prompt('이모지 입력 (비우면 제거)', note.icon ?? '')
-              if (emoji !== null) {
-                onNoteChange({ ...note, icon: emoji || null })
-                window.api.note.update(note.id, { icon: emoji || null })
-              }
-            }}
+            onClick={() => setShowEmojiPicker(p => !p)}
           >
-            {note.icon ?? '🏷️'}
+            {note.icon?.startsWith('custom:')
+              ? <CustomEmojiIcon id={note.icon.slice(7)} />
+              : (note.icon ?? '🏷️')}
           </button>
+          {showEmojiPicker && (
+            <EmojiPicker
+              anchorRef={emojiButtonRef}
+              onSelect={(icon) => {
+                onNoteChange({ ...note, icon })
+                window.api.note.update(note.id, { icon })
+              }}
+              onClear={() => {
+                onNoteChange({ ...note, icon: null })
+                window.api.note.update(note.id, { icon: null })
+              }}
+              onClose={() => setShowEmojiPicker(false)}
+            />
+          )}
           <ColorPicker value={note.color} onChange={handleColorChange} />
         </div>
       </div>

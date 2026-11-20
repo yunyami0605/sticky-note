@@ -146,8 +146,8 @@ export function SelectionToolbar({ editor, dark = false }: Props): JSX.Element |
 
   const toolbar = (
     <div
-      style={{ position: 'fixed', left: pos.x, top: pos.y - 48, transform: 'translateX(-50%)', zIndex: 9999 }}
-      onMouseDown={(e) => e.stopPropagation()}
+      style={{ position: 'fixed', left: pos.x, top: pos.y - 48, transform: 'translateX(-50%)', zIndex: 9999, WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }}
     >
       {/* 서브패널 */}
       {showColors && (

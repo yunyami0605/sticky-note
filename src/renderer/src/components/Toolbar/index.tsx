@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import type { Editor } from '@tiptap/core'
 
 interface Props {
@@ -11,15 +12,16 @@ interface ToolButtonProps {
   active?: boolean
   title: string
   dark?: boolean
+  compact?: boolean
   children: React.ReactNode
 }
 
-function ToolButton({ onClick, active, title, dark, children }: ToolButtonProps): JSX.Element {
+function ToolButton({ onClick, active, title, dark, compact, children }: ToolButtonProps): JSX.Element {
   return (
     <button
       onMouseDown={(e) => { e.preventDefault(); onClick() }}
       title={title}
-      className="w-6 h-6 flex items-center justify-center rounded-md text-xs font-medium transition-all"
+      className={`${compact ? 'w-5 h-5' : 'w-6 h-6'} flex items-center justify-center rounded text-xs font-medium transition-all`}
       style={{
         backgroundColor: active
           ? (dark ? 'rgba(99,102,241,0.3)' : 'rgba(99,102,241,0.14)')
@@ -53,10 +55,10 @@ function ToolButton({ onClick, active, title, dark, children }: ToolButtonProps)
 }
 
 // ── 버튼 그룹 컨테이너 ───────────────────────────────────────
-function ToolGroup({ children, dark }: { children: React.ReactNode; dark?: boolean }): JSX.Element {
+function ToolGroup({ children, dark, compact }: { children: React.ReactNode; dark?: boolean; compact?: boolean }): JSX.Element {
   return (
     <div
-      className="flex items-center rounded-md px-0.5"
+      className={`flex items-center rounded-md ${compact ? '' : 'px-0.5'}`}
       style={{ backgroundColor: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}
     >
       {children}
@@ -496,8 +498,11 @@ function HighlightPicker({ editor, dark }: { editor: Editor; dark?: boolean }): 
 // ── 메인 툴바 ──────────────────────────────────────────────────
 export function Toolbar({ editor, dark }: Props): JSX.Element | null {
   const containerRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const popupRef = useRef<HTMLDivElement>(null)
   const [collapsed, setCollapsed] = useState(false)
   const [popupOpen, setPopupOpen] = useState(false)
+  const [popupCoords, setPopupCoords] = useState<{ bottom: number; right: number; maxHeight: number }>({ bottom: 50, right: 8, maxHeight: 400 })
 
   useEffect(() => {
     const el = containerRef.current
@@ -511,51 +516,63 @@ export function Toolbar({ editor, dark }: Props): JSX.Element | null {
     return () => observer.disconnect()
   }, [])
 
-  // 팝업 외부 클릭 시 닫기
+  // 팝업 외부 클릭 시 닫기 (portal이므로 popupRef도 함께 확인)
   useEffect(() => {
     if (!popupOpen) return
     const handler = (e: MouseEvent): void => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setPopupOpen(false)
-      }
+      const inContainer = containerRef.current?.contains(e.target as Node)
+      const inPopup = popupRef.current?.contains(e.target as Node)
+      if (!inContainer && !inPopup) setPopupOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [popupOpen])
 
+  const handleTogglePopup = (): void => {
+    if (!popupOpen && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setPopupCoords({
+        bottom: window.innerHeight - rect.top + 4,
+        right: Math.max(4, window.innerWidth - rect.right),
+        maxHeight: Math.max(80, rect.top - 8),
+      })
+    }
+    setPopupOpen((v) => !v)
+  }
+
   if (!editor) return null
 
-  const renderButtons = (): JSX.Element => (
+  const renderButtons = (compact?: boolean): JSX.Element => (
     <>
       {/* 서식 그룹 */}
-      <ToolGroup dark={dark}>
-        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="굵게 (⌘B)">
+      <ToolGroup dark={dark} compact={compact}>
+        <ToolButton dark={dark} compact={compact} onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="굵게 (⌘B)">
           <strong style={{ fontWeight: 700 }}>B</strong>
         </ToolButton>
-        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="기울임 (⌘I)">
+        <ToolButton dark={dark} compact={compact} onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="기울임 (⌘I)">
           <em>I</em>
         </ToolButton>
-        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} title="밑줄 (⌘U)">
+        <ToolButton dark={dark} compact={compact} onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} title="밑줄 (⌘U)">
           <span className="underline">U</span>
         </ToolButton>
-        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="취소선">
+        <ToolButton dark={dark} compact={compact} onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="취소선">
           <span className="line-through">S</span>
         </ToolButton>
       </ToolGroup>
 
       {/* 헤딩 그룹 */}
-      <ToolGroup dark={dark}>
-        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} title="제목 1">
+      <ToolGroup dark={dark} compact={compact}>
+        <ToolButton dark={dark} compact={compact} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} title="제목 1">
           <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '-0.02em' }}>H1</span>
         </ToolButton>
-        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="제목 2">
+        <ToolButton dark={dark} compact={compact} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="제목 2">
           <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '-0.02em' }}>H2</span>
         </ToolButton>
       </ToolGroup>
 
       {/* 목록 그룹 */}
-      <ToolGroup dark={dark}>
-        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="불릿 목록">
+      <ToolGroup dark={dark} compact={compact}>
+        <ToolButton dark={dark} compact={compact} onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="불릿 목록">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <circle cx="2" cy="4" r="1.2" fill="currentColor"/>
             <circle cx="2" cy="7" r="1.2" fill="currentColor"/>
@@ -565,7 +582,7 @@ export function Toolbar({ editor, dark }: Props): JSX.Element | null {
             <rect x="4.5" y="9.3" width="4.5" height="1.4" rx="0.7" fill="currentColor" opacity="0.7"/>
           </svg>
         </ToolButton>
-        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="번호 목록">
+        <ToolButton dark={dark} compact={compact} onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="번호 목록">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <text x="0.5" y="5.5" style={{ fontSize: '5px', fontWeight: 700 }} fill="currentColor">1.</text>
             <text x="0.5" y="8.5" style={{ fontSize: '5px', fontWeight: 700 }} fill="currentColor">2.</text>
@@ -575,7 +592,7 @@ export function Toolbar({ editor, dark }: Props): JSX.Element | null {
             <rect x="5" y="9.3" width="4" height="1.3" rx="0.65" fill="currentColor" opacity="0.7"/>
           </svg>
         </ToolButton>
-        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} title="체크리스트">
+        <ToolButton dark={dark} compact={compact} onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} title="체크리스트">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <rect x="0.8" y="2.8" width="3.4" height="3.4" rx="0.8" stroke="currentColor" strokeWidth="1.2"/>
             <path d="M1.6 4.6l0.9 0.9 1.5-1.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
@@ -587,8 +604,8 @@ export function Toolbar({ editor, dark }: Props): JSX.Element | null {
       </ToolGroup>
 
       {/* 블록 그룹 */}
-      <ToolGroup dark={dark}>
-        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="인용문">
+      <ToolGroup dark={dark} compact={compact}>
+        <ToolButton dark={dark} compact={compact} onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="인용문">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <rect x="1" y="2" width="2" height="9" rx="1" fill="currentColor" opacity="0.8"/>
             <rect x="5" y="2" width="2" height="9" rx="1" fill="currentColor" opacity="0.5"/>
@@ -596,28 +613,38 @@ export function Toolbar({ editor, dark }: Props): JSX.Element | null {
             <rect x="8" y="7" width="3" height="1.5" rx="0.75" fill="currentColor" opacity="0.6"/>
           </svg>
         </ToolButton>
-        <ToolButton dark={dark} onClick={() => editor.chain().focus().setHorizontalRule().run()} active={false} title="구분선">
+        <ToolButton dark={dark} compact={compact} onClick={() => editor.chain().focus().setHorizontalRule().run()} active={false} title="구분선">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <rect x="1" y="6" width="11" height="1.5" rx="0.75" fill="currentColor" opacity="0.7"/>
           </svg>
         </ToolButton>
-        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} title="코드 블록">
+        <ToolButton dark={dark} compact={compact} onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} title="코드 블록">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <path d="M4 3L1 6.5L4 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             <path d="M9 3L12 6.5L9 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </ToolButton>
-        <ToolButton dark={dark} onClick={() => {
+        <ToolButton dark={dark} compact={compact} onClick={() => {
           if (editor.isActive('details')) {
             editor.chain().focus().unsetDetails().run()
           } else {
-            editor.chain().focus().insertContent({
-              type: 'details',
-              attrs: { open: true },
-              content: [
-                { type: 'detailsSummary', content: [{ type: 'paragraph' }] },
-                { type: 'detailsContent', content: [{ type: 'paragraph' }] },
-              ],
+            editor.chain().focus().command(({ state, dispatch }) => {
+              const { schema, selection } = state
+              const { $from } = selection
+              if (!schema.nodes.details || !schema.nodes.detailsSummary || !schema.nodes.detailsContent) return false
+              if ($from.depth < 1) return false
+              const topNode = $from.node(1)
+              const topIsParag = topNode.type === schema.nodes.paragraph
+              const summary = schema.nodes.detailsSummary.create({}, topIsParag ? topNode.content : undefined)
+              const detailContent = schema.nodes.detailsContent.create({}, schema.nodes.paragraph.create())
+              const details = schema.nodes.details.create({ open: true }, [summary, detailContent])
+              if (!dispatch) return true
+              if (topIsParag) {
+                dispatch(state.tr.replaceWith($from.before(1), $from.after(1), details))
+              } else {
+                dispatch(state.tr.insert($from.after(1), details))
+              }
+              return true
             }).run()
           }
         }} active={editor.isActive('details')} title="토글 블록">
@@ -626,7 +653,7 @@ export function Toolbar({ editor, dark }: Props): JSX.Element | null {
             <rect x="1" y="9.5" width="11" height="1" rx="0.5" fill="currentColor" opacity="0.4"/>
           </svg>
         </ToolButton>
-        <ToolButton dark={dark} onClick={() => editor.chain().focus().toggleCallout().run()} active={editor.isActive('callout')} title="콜아웃">
+        <ToolButton dark={dark} compact={compact} onClick={() => editor.chain().focus().toggleCallout().run()} active={editor.isActive('callout')} title="콜아웃">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <rect x="1" y="2.5" width="11" height="8" rx="2" stroke="currentColor" strokeWidth="1.2" opacity="0.8"/>
             <path d="M6.5 5.5v3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
@@ -664,7 +691,8 @@ export function Toolbar({ editor, dark }: Props): JSX.Element | null {
       style={{ borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}` }}
     >
       <button
-        onMouseDown={(e) => { e.preventDefault(); setPopupOpen((v) => !v) }}
+        ref={triggerRef}
+        onMouseDown={(e) => { e.preventDefault(); handleTogglePopup() }}
         title="서식 도구"
         className="w-7 h-7 flex items-center justify-center rounded-md transition-colors"
         style={{
@@ -676,24 +704,33 @@ export function Toolbar({ editor, dark }: Props): JSX.Element | null {
             : (dark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)'),
         }}
       >
-        {/* 편집 아이콘 */}
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
           <path d="M9 1.5L11.5 4L5 10.5H2.5V8L9 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
           <path d="M1.5 12h10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity="0.5"/>
         </svg>
       </button>
 
-      {popupOpen && (
+      {popupOpen && createPortal(
         <div
-          className="absolute bottom-full right-0 mb-1 rounded-xl shadow-2xl border z-50 p-2 flex flex-wrap gap-1"
+          ref={popupRef}
+          className="rounded-xl shadow-2xl border p-1.5 flex flex-wrap gap-0.5"
           style={{
+            position: 'fixed',
+            bottom: popupCoords.bottom,
+            right: popupCoords.right,
+            zIndex: 9999,
+            minWidth: 160,
+            maxWidth: 'calc(100vw - 12px)',
+            maxHeight: popupCoords.maxHeight,
+            overflowY: 'auto',
+            WebkitAppRegion: 'no-drag',
             backgroundColor: dark ? '#1e1e2e' : '#ffffff',
             borderColor: dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)',
-            minWidth: 260,
-          }}
+          } as React.CSSProperties}
         >
-          {renderButtons()}
-        </div>
+          {renderButtons(true)}
+        </div>,
+        document.body
       )}
     </div>
   )

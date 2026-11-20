@@ -1,31 +1,28 @@
 # ISSUE-010: 토글 블록 생성 시 기존 텍스트 사라짐
 
-**상태:** open  
+**상태:** closed  
 **우선순위:** high  
 **생성일:** 2026-11-17  
-**수정일:** 2026-11-17  
+**수정일:** 2026-11-20  
 
 ## 문제 설명
 
-슬래시 커맨드 `/토글` 또는 툴바 토글 버튼 클릭 시, 토글 블록이 생성되지 않고 현재 커서 위치의 텍스트가 사라진다.
+슬래시 커맨드 `/토글` 또는 툴바 토글 버튼 클릭 시 토글 블록이 불릿 형태로 표시되거나, 내용이 사라지는 문제.
 
 ## 원인 분석
 
-슬래시 커맨드에서 `editor.chain().focus().deleteRange(range).setDetails().run()` 호출 시 `setDetails()` 커맨드가 올바르게 동작하지 않을 가능성.  
-`@tiptap/extension-details`의 `setDetails` 커맨드가 현재 Tiptap 버전과 호환 문제가 있거나, `Details`/`DetailsContent`/`DetailsSummary` 세 extension이 모두 등록되었는지 확인 필요.
+`@tiptap/extension-details`의 NodeView는 `<div data-type="details">` 를 렌더링하며 기존 CSS `.tiptap details {}` 셀렉터에 매칭되지 않는다. 또한 NodeView 내부의 토글 `<button>` 은 기본적으로 비어있어(aria-label만 설정) 비시각적이고, `DetailsSummary`의 `<summary>` 엘리먼트가 `display: list-item` UA 기본값으로 렌더링되어 불릿처럼 보였다.
 
 ## 해결 방안
 
-### 추후 개선 (TODO)
-
-1. `setDetails()` → `toggleDetails()` 로 변경 시도
-2. 또는 직접 ProseMirror 노드 삽입으로 우회
-3. `Details`, `DetailsContent`, `DetailsSummary` extension이 에디터에 모두 등록되어 있는지 재확인
-4. Tiptap 버전 업그레이드 또는 다운그레이드 검토
+`globals.css`에 `[data-type="details"]` NodeView DOM을 타겟하는 CSS 추가:
+- `> button`에 `position: absolute` + `::after { content: '▶' }` 로 화살표 표시
+- `summary` 에 `display: flex; list-style: none; padding-left: 2.1rem` 로 불릿 제거
+- `.is-open` 클래스 기반 버튼 회전 (90deg)
+- ProseMirror 직접 삽입 (`replaceWith` / `insert`)으로 `setDetails()` 커맨드 의존성 제거
 
 ## 참고
 
-- `src/renderer/src/extensions/` — Details extension 없음, `@tiptap/extension-details` 패키지 사용
-- `src/renderer/src/components/SlashCommandMenu/index.tsx` — 59번째 줄
-- `src/renderer/src/components/Toolbar/index.tsx` — 토글 버튼
-- `src/renderer/src/components/MainPanel/index.tsx` — `InlineEditor` extension 목록
+- `src/renderer/src/styles/globals.css`
+- `src/renderer/src/components/SlashCommandMenu/index.tsx`
+- `src/renderer/src/components/Toolbar/index.tsx`

@@ -14,6 +14,7 @@ import { useNoteStore } from '../../store/noteStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useFolderStore } from '../../store/folderStore'
 import { useTagStore } from '../../store/tagStore'
+import { useCustomEmojiStore } from '../../store/customEmojiStore'
 import { NoteCard } from '../NoteCard'
 import { Toolbar } from '../Toolbar'
 import { SettingsPanel } from '../SettingsPanel'
@@ -46,7 +47,7 @@ function InlineEditor({ isDark }: { isDark: boolean }): JSX.Element | null {
       Color,
       Highlight.configure({ multicolor: true }),
       CodeBlockLowlight.configure({ lowlight }),
-      Details,
+      Details.configure({ persist: true }),
       DetailsContent,
       DetailsSummary,
       Callout,
@@ -110,7 +111,6 @@ const SORT_OPTIONS: { value: SortBy; label: string }[] = [
   { value: 'updatedAt', label: '최근 수정순' },
   { value: 'createdAt', label: '최근 생성순' },
   { value: 'color',     label: '색상별' },
-  { value: 'manual',   label: '직접 정렬' },
 ]
 
 function SortDropdown({ sortBy, onChange }: { sortBy: SortBy; onChange: (s: SortBy) => void }): JSX.Element {
@@ -126,11 +126,11 @@ function SortDropdown({ sortBy, onChange }: { sortBy: SortBy; onChange: (s: Sort
   }, [])
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
       <button
-        onClick={() => setOpen((v) => !v)}
+        onMouseDown={(e) => { e.preventDefault(); setOpen((v) => !v) }}
         className="transition-opacity hover:opacity-80"
-        style={{ color: 'var(--app-text-muted)', WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        style={{ color: 'var(--app-text-muted)' }}
         title="정렬"
       >
         <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -140,12 +140,12 @@ function SortDropdown({ sortBy, onChange }: { sortBy: SortBy; onChange: (s: Sort
       {open && (
         <div
           className="absolute top-full left-0 mt-1 rounded-lg shadow-xl border z-50 overflow-hidden min-w-[120px]"
-          style={{ backgroundColor: 'var(--app-sidebar)', borderColor: 'var(--app-border)' }}
+          style={{ backgroundColor: 'var(--app-sidebar)', borderColor: 'var(--app-border)', WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           {SORT_OPTIONS.map((opt) => (
             <button
               key={opt.value}
-              onClick={() => { onChange(opt.value); setOpen(false) }}
+              onMouseDown={(e) => { e.preventDefault(); onChange(opt.value); setOpen(false) }}
               className="flex items-center justify-between w-full px-3 py-1.5 text-xs transition-colors"
               style={{
                 backgroundColor: sortBy === opt.value ? 'var(--app-active)' : 'transparent',
@@ -906,12 +906,6 @@ function SidebarTree({
         onDeleteSelected={handleDeleteSelected}
         onCancelSelection={() => setSelectionState(null)}
         onNoteDropOnNote={(dId, tId, before) => handleNoteDropOnNote(folder.id, dId, tId, before)}
-        sortBy={getSectionSort(folder.id)}
-        onCycleSort={() => {
-          const sorts: SortBy[] = ['updatedAt', 'createdAt', 'manual']
-          const cur = getSectionSort(folder.id)
-          setSectionSort(folder.id, sorts[(sorts.indexOf(cur) + 1) % sorts.length])
-        }}
         renamingContent={isRenaming ? (
           <input
             autoFocus
@@ -1031,10 +1025,11 @@ function SidebarTree({
 export function MainPanel(): JSX.Element {
   const { notes, isLoading, loadNotes, createNote, deleteNote, duplicateNote, openNoteWindow, selectedId, setSelectedId, _addNote, _removeNote, setWindowOpen, _syncNote } = useNoteStore()
   const { themeMode, themeColor, loaded, load: loadSettings, shortcuts, update: updateSettings } = useSettingsStore()
+  const { load: loadCustomEmojis } = useCustomEmojiStore()
   const isDark = themeMode === 'dark'
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState<SortBy>('manual')
+  const [sortBy, setSortBy] = useState<SortBy>('updatedAt')
   const [showSettings, setShowSettings] = useState(false)
   const [showSidebar, setShowSidebar] = useState(true)
   const [addFolderTrigger, setAddFolderTrigger] = useState(false)
@@ -1043,13 +1038,14 @@ export function MainPanel(): JSX.Element {
   useEffect(() => {
     loadSettings()
     loadNotes()
+    loadCustomEmojis()
     const offCreated = window.api.note.onCreated(_addNote)
     const offDeleted = window.api.note.onDeleted(_removeNote)
     const offUpdated = window.api.note.onUpdated(_syncNote)
     const offWinOpened = window.api.note.onWindowOpened((id) => setWindowOpen(id, true))
     const offWinClosed = window.api.note.onWindowClosed((id) => setWindowOpen(id, false))
     return () => { offCreated(); offDeleted(); offUpdated(); offWinOpened(); offWinClosed() }
-  }, [loadNotes, _addNote, _removeNote, loadSettings, setWindowOpen])
+  }, [loadNotes, _addNote, _removeNote, loadSettings, setWindowOpen, loadCustomEmojis])
 
   useEffect(() => {
     const matchShortcut = (e: KeyboardEvent, sc: typeof shortcuts.newNote): boolean =>
