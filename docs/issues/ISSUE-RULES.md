@@ -9,48 +9,51 @@ Claude가 이슈를 생성하거나 업데이트할 때 이 규칙을 따릅니�
 
 ```
 docs/issues/
-├── ISSUE-RULES.md                              ← 이 파일 (규칙 문서)
-├── ISSUE-INDEX.md                              ← 전체 이슈 목록 대시보드
-├── ISSUE-001-2026-11-09-제목.md
-├── ISSUE-002-2026-11-17-제목.md
-└── ...
+├── ISSUE-RULES.md          ← 이 파일 (규칙 문서)
+├── .counter                ← 마지막으로 발급된 이슈 번호 (숫자만)
+├── open/
+│   └── ISSUE-NNN/
+│       └── issue.md        ← open / in-progress / resolved / deferred 상태
+└── closed/
+    └── ISSUE-NNN/
+        └── issue.md        ← closed 상태
 ```
+
+---
+
+## 이슈 번호 발급
+
+`.counter` 파일에 마지막으로 발급된 번호가 저장된다.
+
+**새 이슈 생성 절차:**
+1. `.counter` 파일을 읽어 현재 값 N을 확인
+2. 새 번호 = N + 1
+3. `open/ISSUE-{NNN}/issue.md` 파일 생성
+4. `.counter` 파일을 N+1로 업데이트
+
+> **이슈 번호 재사용 금지** — closed 이슈 번호는 영구 보존
 
 ---
 
 ## 네이밍 컨벤션
 
-```
-ISSUE-{NNN}-{YYYY-MM-DD}-{짧은-설명}.md
-```
-
-- `NNN`: 3자리 숫자, 001부터 순차 증가
-- `YYYY-MM-DD`: 이슈 **생성일**
-- 짧은 설명: 영어 소문자 + 하이픈, 최대 5단어
-- 예: `ISSUE-001-2026-11-09-windows-korean-spellcheck.md`
+- 폴더명: `ISSUE-{NNN}` (3자리 숫자, 001부터 순차 증가)
+- 파일명: 폴더 내 항상 `issue.md` 고정
+- 예: `open/ISSUE-015/issue.md`
 
 ---
 
-## ISSUE-INDEX.md 구조
+## 상태와 위치
 
-전체 이슈를 한눈에 볼 수 있는 대시보드 파일.  
-이슈 생성/상태 변경 시 반드시 함께 업데이트한다.
-
-```markdown
-| 번호 | 제목 | 진행도 | 내용 | 테스트 결과 |
-|------|------|--------|------|------------|
-| [ISSUE-001](파일경로) | 제목 | open | 한줄 요약 | - |
-```
-
-**컬럼 정의:**
-
-| 컬럼 | 설명 |
+| 상태 | 위치 |
 |------|------|
-| 번호 | 파일 링크 포함 (`[ISSUE-NNN](파일명)`) |
-| 제목 | 이슈 제목 (한국어) |
-| 진행도 | `open` / `in-progress` / `resolved` / `deferred` / `closed` |
-| 내용 | 문제 현상 한 줄 요약 |
-| 테스트 결과 | 수정 후 검증 결과. 미검증이면 `-` |
+| `open` | `open/ISSUE-NNN/` |
+| `in-progress` | `open/ISSUE-NNN/` |
+| `resolved` | `open/ISSUE-NNN/` |
+| `deferred` | `open/ISSUE-NNN/` |
+| `closed` | `closed/ISSUE-NNN/` |
+
+**closed로 전환 시:** `open/ISSUE-NNN/` → `closed/ISSUE-NNN/` 폴더 이동
 
 ---
 
@@ -122,9 +125,9 @@ open → in-progress → resolved → closed
 
 ## 운영 규칙
 
-1. **새 이슈 생성 시** — 파일 생성 후 `ISSUE-INDEX.md`도 즉시 업데이트
-2. **상태 변경 시** — 이슈 파일과 `ISSUE-INDEX.md` 동시 업데이트, 수정일 갱신
+1. **새 이슈 생성 시** — `.counter` 읽어 번호 발급 → `open/ISSUE-NNN/issue.md` 생성 → `.counter` 증가
+2. **상태 변경 시** — `issue.md` 업데이트, 수정일 갱신
 3. **코드 반영 완료 시** — 상태를 `resolved`로, 테스트 결과란에 "테스트 대기" 기재
-4. **테스트 완료 시** — 상태를 `closed`로, 테스트 결과란에 검증 내용 기재
+4. **테스트 완료 시** — 상태를 `closed`로 변경 + `open/ISSUE-NNN/` → `closed/ISSUE-NNN/` 폴더 이동
 5. **부분 해결 시** — 상태를 `deferred`로, "현재 적용"과 "추후 개선" 분리 기재
 6. **이슈 번호 재사용 금지** — closed 이슈 번호는 영구 보존

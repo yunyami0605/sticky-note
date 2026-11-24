@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import TaskList from '@tiptap/extension-task-list'
@@ -364,6 +364,7 @@ function FolderContextMenu({
   onRename, onDelete, onNewNote, onNewFolder, onDuplicate, onMoveUp, onMoveDown, onSelectDelete,
 }: FolderCtxMenuProps): JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ top: y, left: x })
 
   useEffect(() => {
     const handler = (e: MouseEvent): void => {
@@ -372,6 +373,14 @@ function FolderContextMenu({
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [onClose])
+
+  useLayoutEffect(() => {
+    if (!ref.current) return
+    const { offsetHeight, offsetWidth } = ref.current
+    const top = y + offsetHeight > window.innerHeight - 8 ? y - offsetHeight : y
+    const left = x + offsetWidth > window.innerWidth - 8 ? x - offsetWidth : x
+    setPos({ top: Math.max(8, top), left: Math.max(8, left) })
+  }, [x, y])
 
   const menuBg = isDark ? '#2a2a3e' : '#ffffff'
   const menuBorder = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'
@@ -402,7 +411,7 @@ function FolderContextMenu({
     <div
       ref={ref}
       className="fixed z-[9999] py-1 rounded-lg shadow-xl"
-      style={{ left: x, top: y, minWidth: 170, backgroundColor: menuBg, border: `1px solid ${menuBorder}` }}
+      style={{ left: pos.left, top: pos.top, minWidth: 170, backgroundColor: menuBg, border: `1px solid ${menuBorder}` }}
     >
       {item('새 메모 추가', () => { onNewNote(); onClose() })}
       {sep()}
