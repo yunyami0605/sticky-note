@@ -21,6 +21,55 @@ interface Props {
   selectionMode?: boolean
   selected?: boolean
   onToggleSelect?: () => void
+  searchQuery?: string
+}
+
+// 전체 텍스트에서 검색어 주변 스니펫 추출
+function getSearchSnippet(content: string, query: string): string {
+  if (!content || !query) return ''
+  try {
+    const parsed = JSON.parse(content)
+    const lines: string[] = []
+    parsed.content?.forEach((block: unknown) => {
+      const parts: string[] = []
+      const walk = (node: { text?: string; content?: unknown[] }): void => {
+        if (node.text) parts.push(node.text)
+        node.content?.forEach((c) => walk(c as typeof node))
+      }
+      walk(block as { text?: string; content?: unknown[] })
+      const line = parts.join('').trim()
+      if (line) lines.push(line)
+    })
+    const q = query.toLowerCase()
+    // 매칭되는 첫 번째 라인 찾기 (제목 제외, 2번째 줄부터)
+    for (let i = 1; i < lines.length; i++) {
+      const idx = lines[i].toLowerCase().indexOf(q)
+      if (idx >= 0) {
+        const start = Math.max(0, idx - 15)
+        const end = Math.min(lines[i].length, idx + query.length + 30)
+        return (start > 0 ? '...' : '') + lines[i].slice(start, end) + (end < lines[i].length ? '...' : '')
+      }
+    }
+    // 제목에서만 매칭된 경우 기본 미리보기
+    return lines.slice(1).join(' ').trim().slice(0, 80)
+  } catch { return '' }
+}
+
+// 텍스트에서 검색어 하이라이트 JSX 생성
+function highlight(text: string, query: string): JSX.Element {
+  if (!query) return <>{text}</>
+  const q = query.toLowerCase()
+  const idx = text.toLowerCase().indexOf(q)
+  if (idx < 0) return <>{text}</>
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark style={{ background: 'rgba(99,102,241,0.3)', color: 'inherit', borderRadius: '2px', padding: '0 1px' }}>
+        {text.slice(idx, idx + query.length)}
+      </mark>
+      {text.slice(idx + query.length)}
+    </>
+  )
 }
 
 function getTitle(content: string): string {
@@ -189,7 +238,7 @@ function ContextMenu({ x, y, noteId, currentFolderId, isWindowOpen, isDark, onCl
   )
 }
 
-export function NoteCard({ note, isDark = true, indent = false, selectionMode = false, selected = false, onToggleSelect }: Props): JSX.Element {
+export function NoteCard({ note, isDark = true, indent = false, selectionMode = false, selected = false, onToggleSelect, searchQuery = '' }: Props): JSX.Element {
   const { selectedId, setSelectedId, openWindowIds, toggleNoteWindow } = useNoteStore()
   const { tags, noteTagMap } = useTagStore()
   const { emojis: customEmojis } = useCustomEmojiStore()
@@ -201,7 +250,7 @@ export function NoteCard({ note, isDark = true, indent = false, selectionMode = 
     .filter(Boolean) as typeof tags
 
   const title = getTitle(note.content)
-  const preview = getPreview(note.content)
+  const preview = searchQuery ? getSearchSnippet(note.content, searchQuery) : getPreview(note.content)
 
   const handleContextMenu = (e: React.MouseEvent): void => {
     if (selectionMode) return
@@ -287,7 +336,7 @@ export function NoteCard({ note, isDark = true, indent = false, selectionMode = 
             {!note.content ? (
               <span className="w-4 h-4 rounded-full bg-red-500 flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0">N</span>
             ) : null}
-            <span className="truncate">{title}</span>
+            <span className="truncate">{searchQuery ? highlight(title, searchQuery) : title}</span>
           </span>
 
           {/* 미리보기 */}
@@ -296,7 +345,7 @@ export function NoteCard({ note, isDark = true, indent = false, selectionMode = 
               className="text-[11px] truncate leading-snug"
               style={{ color: 'var(--app-text-dim)' }}
             >
-              {preview}
+              {searchQuery ? highlight(preview, searchQuery) : preview}
             </span>
           )}
 

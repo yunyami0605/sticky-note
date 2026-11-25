@@ -285,7 +285,7 @@ function sortNotes(notes: Note[], sortBy: SortBy): Note[] {
 }
 
 function NoteReorderWrapper({
-  note, isDark, selectionMode, selected, onToggleSelect, onDropOnNote,
+  note, isDark, selectionMode, selected, onToggleSelect, onDropOnNote, searchQuery,
 }: {
   note: Note
   isDark: boolean
@@ -293,6 +293,7 @@ function NoteReorderWrapper({
   selected: boolean
   onToggleSelect: () => void
   onDropOnNote?: (draggedId: string, targetId: string, before: boolean) => void
+  searchQuery?: string
 }): JSX.Element {
   const [indicator, setIndicator] = useState<'before' | 'after' | null>(null)
   return (
@@ -328,6 +329,7 @@ function NoteReorderWrapper({
         selectionMode={selectionMode}
         selected={selected}
         onToggleSelect={onToggleSelect}
+        searchQuery={searchQuery}
       />
       {indicator === 'after' && (
         <div className="absolute bottom-0 left-0 right-0 h-0.5 z-10 pointer-events-none" style={{ backgroundColor: 'rgba(99,102,241,0.8)' }} />
@@ -456,6 +458,7 @@ interface TreeSectionProps {
   subContent?: React.ReactNode
   sortBy?: SortBy
   onCycleSort?: () => void
+  searchQuery?: string
 }
 
 function TreeSection({
@@ -463,7 +466,7 @@ function TreeSection({
   onToggle, onNewNote, onDelete, onRename, renamingContent,
   onDropNote, onDropFolder, onNestFolder, draggableFolder, onFolderDragStart,
   onContextMenu, selectionState, onToggleNoteSelect, onDeleteSelected, onCancelSelection,
-  onNoteDropOnNote, subContent, sortBy, onCycleSort,
+  onNoteDropOnNote, subContent, sortBy, onCycleSort, searchQuery,
 }: TreeSectionProps): JSX.Element {
   const isSelecting = selectionState?.sectionId === sectionId
   const selectedCount = isSelecting ? selectionState!.selected.size : 0
@@ -705,6 +708,7 @@ function TreeSection({
                 selected={isSelecting && selectionState!.selected.has(note.id)}
                 onToggleSelect={() => onToggleNoteSelect?.(note.id)}
                 onDropOnNote={onNoteDropOnNote}
+                searchQuery={searchQuery}
               />
             ))
           )}
@@ -915,6 +919,7 @@ function SidebarTree({
         onDeleteSelected={handleDeleteSelected}
         onCancelSelection={() => setSelectionState(null)}
         onNoteDropOnNote={(dId, tId, before) => handleNoteDropOnNote(folder.id, dId, tId, before)}
+        searchQuery={searchQuery}
         renamingContent={isRenaming ? (
           <input
             autoFocus
@@ -959,6 +964,7 @@ function SidebarTree({
         onDeleteSelected={handleDeleteSelected}
         onCancelSelection={() => setSelectionState(null)}
         onNoteDropOnNote={(dId, tId, before) => handleNoteDropOnNote('uncategorized', dId, tId, before)}
+        searchQuery={searchQuery}
       />
 
       {/* 사용자 폴더 (재귀적) */}
