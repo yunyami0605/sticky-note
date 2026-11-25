@@ -129,7 +129,19 @@ class DragHandleView {
 
     const rect = domNode.getBoundingClientRect()
     const isAbove = clientY < rect.top + rect.height / 2
-    const lineY = isAbove ? rect.top - 1 : rect.bottom - 1
+
+    let lineY: number
+    if (isAbove) {
+      const prevBlock = block.pos > 0 ? this.findTopLevelBlock(block.pos - 1) : null
+      const prevDom = prevBlock ? this.view.nodeDOM(prevBlock.pos) as HTMLElement | null : null
+      const prevBottom = prevDom ? prevDom.getBoundingClientRect().bottom : rect.top
+      lineY = (prevBottom + rect.top) / 2
+    } else {
+      const nextPos = block.pos + block.node.nodeSize
+      const nextDom = this.view.nodeDOM(nextPos) as HTMLElement | null
+      const nextTop = nextDom ? nextDom.getBoundingClientRect().top : rect.bottom
+      lineY = (rect.bottom + nextTop) / 2
+    }
 
     this.dropLine.style.display = 'block'
     this.dropLine.style.left = `${rect.left}px`
