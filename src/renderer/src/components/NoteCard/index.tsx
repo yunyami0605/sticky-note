@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import type { Note } from '../../../../shared/types'
 import { useNoteStore } from '../../store/noteStore'
 import { useTagStore } from '../../store/tagStore'
@@ -135,15 +136,30 @@ function ContextMenu({ x, y, noteId, currentFolderId, isWindowOpen, isDark, onCl
   const { deleteNote, duplicateNote, toggleNoteWindow, updateNote } = useNoteStore()
   const { folders } = useFolderStore()
   const ref = useRef<HTMLDivElement>(null)
-  const [showFolderMenu, setShowFolderMenu] = useState(false)
+  const moveRowRef = useRef<HTMLButtonElement>(null)
+  const subMenuRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ top: y, left: x })
+  const [subPos, setSubPos] = useState<{ top: number; left: number } | null>(null)
 
   useEffect(() => {
     const handler = (e: MouseEvent): void => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+      if (
+        ref.current && !ref.current.contains(e.target as Node) &&
+        (!subMenuRef.current || !subMenuRef.current.contains(e.target as Node))
+      ) onClose()
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [onClose])
+
+  // 메인 메뉴 뷰포트 경계 반전
+  useLayoutEffect(() => {
+    if (!ref.current) return
+    const { offsetHeight, offsetWidth } = ref.current
+    const top = y + offsetHeight > window.innerHeight - 8 ? y - offsetHeight : y
+    const left = x + offsetWidth > window.innerWidth - 8 ? x - offsetWidth : x
+    setPos({ top: Math.max(8, top), left: Math.max(8, left) })
+  }, [x, y])
 
   const menuBg     = isDark ? '#1e1e2e' : '#ffffff'
   const menuBorder = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.08)'
@@ -156,7 +172,7 @@ function ContextMenu({ x, y, noteId, currentFolderId, isWindowOpen, isDark, onCl
       onMouseDown={(e) => { e.stopPropagation(); onClick() }}
       className="flex items-center gap-2 w-full px-3 py-1.5 text-left text-xs transition-colors rounded-md"
       style={{ color: color ?? menuText }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = menuHover }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = menuHover; setSubPos(null) }}
       onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
     >
       <span className="w-3 flex-shrink-0 text-center text-[10px]">{check ? '✓' : ''}</span>
@@ -173,68 +189,109 @@ function ContextMenu({ x, y, noteId, currentFolderId, isWindowOpen, isDark, onCl
     onClose()
   }
 
-  return (
-    <div
-      ref={ref}
-      className="fixed z-[9999] py-1.5 rounded-xl shadow-2xl"
-      style={{
-        left: x, top: y, minWidth: 168,
-        backgroundColor: menuBg,
-        border: `1px solid ${menuBorder}`,
-        backdropFilter: 'blur(12px)',
-      }}
-    >
-      <div className="px-1">
-        {item('노트 팝업', async () => { await toggleNoteWindow(noteId); onClose() }, undefined, isWindowOpen)}
-        {sep()}
-        {item('메모 복제', async () => { await duplicateNote(noteId); onClose() })}
+  const handleMoveRowEnter = (): void => {
+    if (!moveRowRef.current) return
+    const rect = moveRowRef.current.getBoundingClientRect()
+    const subW = 160
+    // 오른쪽에 공간 있으면 오른쪽, 없으면 왼쪽
+    const left = rect.right + subW > window.innerWidth - 8 ? rect.left - subW : rect.right
+    // 위아래 경계 보정
+    const estimatedH = (folders.length + 1) * 28 + 12
+    const top = Math.min(rect.top, window.innerHeight - estimatedH - 8)
+    setSubPos({ top: Math.max(8, top), left })
+  }
 
+  // 폴더 계층 렌더링 (재귀)
+  const renderFolderItems = (parentId: string | null, depth: number): JSX.Element[] => {
+    return folders
+      .filter((f) => f.parentId === parentId)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .flatMap((folder) => [
         <button
-          onMouseDown={(e) => { e.stopPropagation(); setShowFolderMenu((v) => !v) }}
-          className="flex items-center gap-2 w-full px-3 py-1.5 text-left text-xs transition-colors rounded-md"
-          style={{ color: menuText }}
+          key={folder.id}
+          onMouseDown={(e) => { e.stopPropagation(); void handleMoveToFolder(folder.id) }}
+          className="flex items-center w-full px-2 py-1.5 text-left text-xs transition-colors rounded-md"
+          style={{ color: menuText, paddingLeft: `${8 + depth * 12}px` }}
           onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = menuHover }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
         >
-          <span className="w-3 flex-shrink-0" />
-          폴더로 이동
-          <span className="ml-auto text-[10px]" style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.28)' }}>
-            {showFolderMenu ? '▾' : '▸'}
+          <span className="text-[9px] w-3 mr-1.5 flex-shrink-0 text-center">
+            {currentFolderId === folder.id ? '✓' : ''}
           </span>
-        </button>
+          <span className="truncate">{folder.name}</span>
+        </button>,
+        ...renderFolderItems(folder.id, depth + 1),
+      ])
+  }
 
-        {showFolderMenu && (
-          <div className="ml-2 my-0.5 pl-2 border-l" style={{ borderColor: menuBorder }}>
+  return (
+    <>
+      <div
+        ref={ref}
+        className="fixed z-[9999] py-1.5 rounded-xl shadow-2xl"
+        style={{
+          left: pos.left, top: pos.top, minWidth: 168,
+          backgroundColor: menuBg,
+          border: `1px solid ${menuBorder}`,
+          backdropFilter: 'blur(12px)',
+        }}
+      >
+        <div className="px-1">
+          {item('노트 팝업', async () => { await toggleNoteWindow(noteId); onClose() }, undefined, isWindowOpen)}
+          {sep()}
+          {item('메모 복제', async () => { await duplicateNote(noteId); onClose() })}
+
+          {/* 폴더로 이동 — 호버 시 사이드 서브메뉴 */}
+          <button
+            ref={moveRowRef}
+            className="flex items-center gap-2 w-full px-3 py-1.5 text-left text-xs transition-colors rounded-md"
+            style={{ color: menuText }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = menuHover; handleMoveRowEnter() }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
+          >
+            <span className="w-3 flex-shrink-0" />
+            폴더로 이동
+            <span className="ml-auto text-[10px]" style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.28)' }}>▸</span>
+          </button>
+
+          {sep()}
+          {item('메모 삭제', async () => { await deleteNote(noteId); onClose() }, destructive)}
+        </div>
+      </div>
+
+      {/* 폴더 서브메뉴 — Portal */}
+      {subPos && createPortal(
+        <div
+          ref={subMenuRef}
+          className="fixed z-[10000] py-1.5 rounded-xl shadow-2xl"
+          style={{
+            left: subPos.left, top: subPos.top, minWidth: 160,
+            backgroundColor: menuBg,
+            border: `1px solid ${menuBorder}`,
+            backdropFilter: 'blur(12px)',
+          }}
+          onMouseEnter={() => { /* 서브메뉴 위에 있는 동안 유지 */ }}
+          onMouseLeave={() => setSubPos(null)}
+        >
+          <div className="px-1">
+            {/* 미분류 */}
             <button
-              onMouseDown={(e) => { e.stopPropagation(); handleMoveToFolder(null) }}
-              className="flex items-center gap-1.5 w-full px-2 py-1 text-left text-[11px] transition-colors rounded-md"
-              style={{ color: currentFolderId === null ? menuText : (isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.42)') }}
+              onMouseDown={(e) => { e.stopPropagation(); void handleMoveToFolder(null) }}
+              className="flex items-center w-full px-2 py-1.5 text-left text-xs transition-colors rounded-md"
+              style={{ color: menuText }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = menuHover }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
             >
-              <span className="text-[9px] w-2.5">{currentFolderId === null ? '✓' : ''}</span>
-              미분류
+              <span className="text-[9px] w-3 mr-1.5 flex-shrink-0 text-center">{currentFolderId === null ? '✓' : ''}</span>
+              <span>미분류</span>
             </button>
-            {folders.map((folder) => (
-              <button
-                key={folder.id}
-                onMouseDown={(e) => { e.stopPropagation(); handleMoveToFolder(folder.id) }}
-                className="flex items-center gap-1.5 w-full px-2 py-1 text-left text-[11px] transition-colors rounded-md"
-                style={{ color: currentFolderId === folder.id ? menuText : (isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.42)') }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = menuHover }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
-              >
-                <span className="text-[9px] w-2.5">{currentFolderId === folder.id ? '✓' : ''}</span>
-                {folder.name}
-              </button>
-            ))}
+            {folders.length > 0 && <div style={{ height: 1, margin: '3px 8px', backgroundColor: menuBorder }} />}
+            {renderFolderItems(null, 0)}
           </div>
-        )}
-
-        {sep()}
-        {item('메모 삭제', async () => { await deleteNote(noteId); onClose() }, destructive)}
-      </div>
-    </div>
+        </div>,
+        document.body
+      )}
+    </>
   )
 }
 
